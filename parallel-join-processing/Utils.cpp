@@ -37,7 +37,7 @@ void Utils::storeRelation(ofstream& out, Relation& r, unsigned i)
 /* --------------------- Write output stream to file --------------------- */
 ofstream write_file;
 void Utils::open_log_file() {
-	write_file.open("words.txt", std::ios::trunc);
+	write_file.open("log.txt", std::ios::trunc);
 }
 void Utils::close_log_file() {
 	write_file.close();
