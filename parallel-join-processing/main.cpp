@@ -1,25 +1,41 @@
 #include <iostream>
 #include "Joiner.hpp"
 #include "Parser.hpp"
+#include "Utils.hpp"
 
 using namespace std;
-//---------------------------------------------------------------------------
+
 int main(int argc, char* argv[]) {
-   Joiner joiner;
-   // Read join relations
-   string line;
-   while (getline(cin, line)) {
-      if (line == "Done") break;
-      joiner.addRelation(line.c_str());
-   }
-   // Preparation phase (not timed)
-   // Build histograms, indexes,...
-   //
-   QueryInfo i;
-   while (getline(cin, line)) {
-      if (line == "F") continue; // End of a batch
-      i.parseQuery(line);
-      cout << joiner.join(i);
-   }
-   return 0;
+	Joiner joiner;
+
+	Utils::open_log_file();
+
+	// Read join relations
+	string line;
+	while (getline(cin, line)) {
+		// DEBUG :: Print Relations
+		Utils::print_log(true, "MAIN-RELATIONS", line + (line == "Done" ? "\n" : ""));
+
+		if (line == "Done") break;
+		joiner.addRelation(line.c_str());
+	}
+
+	// Preparation phase (not timed)
+	// Build histograms, indexes,...
+
+	QueryInfo i;
+	while (getline(cin, line)) {
+		// DEBUG :: Print Queries
+		Utils::print_log(true, "MAIN-QUERIES", line + (line == "F" ? "\n" : ""));
+
+		if (line == "F") continue; // End of a batch
+		i.parseQuery(line);
+		string join_result = joiner.join(i);
+		cout << join_result;
+		Utils::print_log(true, "MAIN-QUERIES_OUTPUT", join_result);
+	}
+
+	Utils::close_log_file();
+
+	return 0;
 }

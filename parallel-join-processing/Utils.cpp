@@ -3,34 +3,50 @@
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-static void createColumn(vector<uint64_t*>& columns,uint64_t numTuples)
-  // Create a dummy column
+static void createColumn(vector<uint64_t*>& columns, uint64_t numTuples)
+// Create a dummy column
 {
-  auto col=new uint64_t[numTuples];
-  columns.push_back(col);
-  for (unsigned i=0;i<numTuples;++i) {
-    col[i]=i;
-  }
+	auto col = new uint64_t[numTuples];
+	columns.push_back(col);
+	for (unsigned i = 0; i < numTuples; ++i) {
+		col[i] = i;
+	}
 }
 //---------------------------------------------------------------------------
-Relation Utils::createRelation(uint64_t size,uint64_t numColumns)
-  // Create a dummy relation
+Relation Utils::createRelation(uint64_t size, uint64_t numColumns)
+// Create a dummy relation
 {
-  vector<uint64_t*> columns;
-  for (unsigned i=0;i<numColumns;++i) {
-    createColumn(columns,size);
-  }
-  return Relation(size,move(columns));
+	vector<uint64_t*> columns;
+	for (unsigned i = 0; i < numColumns; ++i) {
+		createColumn(columns, size);
+	}
+	return Relation(size, move(columns));
 }
 //---------------------------------------------------------------------------
-void Utils::storeRelation(ofstream& out,Relation& r,unsigned i)
-  // Store a relation in all formats
+void Utils::storeRelation(ofstream& out, Relation& r, unsigned i)
+// Store a relation in all formats
 {
-  auto baseName = "r" + to_string(i);
-  r.storeRelation(baseName);
-  r.storeRelationCSV(baseName);
-  r.dumpSQL(baseName, i);
-  cout << baseName << "\n";
-  out << baseName << "\n";
+	auto baseName = "r" + to_string(i);
+	r.storeRelation(baseName);
+	r.storeRelationCSV(baseName);
+	r.dumpSQL(baseName, i);
+	cout << baseName << "\n";
+	out << baseName << "\n";
 }
 //---------------------------------------------------------------------------
+/* --------------------- Write output stream to file --------------------- */
+ofstream write_file;
+void Utils::open_log_file() {
+	write_file.open("words.txt", std::ios::trunc);
+}
+void Utils::close_log_file() {
+	write_file.close();
+}
+void Utils::print_log(bool flag, string role, string target) {
+	if (!flag) return;
+
+	string output = role + " :: " + target + "\n";
+	if (write_file.is_open())
+		write_file.write(output.c_str(), output.size());
+}
+/* ----------------------------------------------------------------------- */
