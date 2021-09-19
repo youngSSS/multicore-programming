@@ -50,4 +50,11 @@ void Utils::printLog(string role, string target) {
 	if (logFile.is_open())
 		logFile.write(output.c_str(), output.size());
 }
+void Utils::printNewLine() {
+	if (!logFlag) return;
+
+	string output = "\n";
+	if (logFile.is_open())
+		logFile.write(output.c_str(), output.size());
+}
 /* ----------------------------------------------------------------------- */

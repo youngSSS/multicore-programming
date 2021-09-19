@@ -1,8 +1,6 @@
 #include "Joiner.hpp"
-#include <cassert>
 #include <iostream>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <set>
 #include <sstream>
@@ -16,6 +14,8 @@ void Joiner::addRelation(const char* fileName)
 // Loads a relation from disk
 {
 	relations.emplace_back(fileName);
+//	for (auto col : relations[relations.size() - 1].columns)
+//		Utils::printLog("JOINER-ADD_RELATION-COLUMN", to_string(*col));
 }
 //---------------------------------------------------------------------------
 Relation& Joiner::getRelation(unsigned relationId)
@@ -32,20 +32,14 @@ unique_ptr<Operator> Joiner::addScan(set<unsigned>& usedRelations, SelectInfo& i
 // Add scan to query
 {
 	usedRelations.emplace(info.binding);
+
+	// Predicate를 수행하기 전에 현재 Column에 대해 적용할 수 있는 필터를 먼저 적용
 	vector<FilterInfo> filters;
 	for (auto& f : query.filters) {
 		if (f.filterColumn.binding == info.binding) {
 			filters.emplace_back(f);
 		}
 	}
-
-	Utils::printLog("JOINER-ADDSCAN-BINDING", to_string(info.binding));
-	for (auto& f : filters)
-		Utils::printLog("JOINER-ADDSCAN-FILTER", to_string(f.constant));
-	for (auto& f : query.filters) {
-		Utils::printLog("JOINER-ADDSCAN-QUERY_FILTER", to_string(f.filterColumn.binding));
-	}
-	Utils::printLog("", "\n");
 
 	return !filters.empty() ? make_unique<FilterScan>(getRelation(info.relId), filters) : make_unique<Scan>(getRelation(
 		info.relId), info.binding);
@@ -71,18 +65,64 @@ static QueryGraphProvides analyzeInputOfJoin(set<unsigned>& usedRelations, Selec
 string Joiner::join(QueryInfo& query)
 // Executes a join query
 {
-	//cerr << query.dumpText() << endl;
-	set<unsigned> usedRelations;
+	/* --------------- DEBUG :: Print Information of Query --------------- */
+	// Relation Id
+	string relationIdList;
+	for (auto q : query.relationIds) relationIdList += to_string(q) + ", ";
+	Utils::printLog("JOINER-RELATION_ID_LIST",
+		relationIdList.substr(0, relationIdList.size() - 2) + "\n");
 
-	for (auto q : query.relationIds)
-		Utils::printLog("JOINER-RELATION_ID", to_string(q));
-//	for (auto q : query.predicates)
-//		Utils::printLog("JOINER-RELATION_ID", q);
-//	for (auto q : query.filters)
-//		Utils::printLog("JOINER-RELATION_ID", q);
-//	for (auto q : query.selections)
-//		Utils::printLog("JOINER-RELATION_ID", q);
-	Utils::printLog("", "\n");
+	// Predicate
+	for (PredicateInfo predicateInfo : query.predicates) {
+		SelectInfo leftInfo = predicateInfo.left;
+		string leftRelationId = to_string(leftInfo.binding);
+		string leftColumnId = to_string(leftInfo.colId);
+
+		SelectInfo rightInfo = predicateInfo.right;
+		string rightRelationId = to_string(rightInfo.binding);
+		string rightColumnId = to_string(rightInfo.colId);
+
+		Utils::printLog("JOINER-QUERY-PREDICATE-[LEFT, RIGHT]",
+			"[" + leftRelationId + "." + leftColumnId + ", " + rightRelationId + "." + rightColumnId + "]" +
+				" (r_id = " + leftRelationId + ", col_id = " + leftColumnId + " and "
+																			  "r_id = " + rightRelationId
+				+ ", col_id = " + rightColumnId + ")");
+	}
+	Utils::printNewLine();
+
+	// Filter
+	for (FilterInfo filterInfo : query.filters) {
+		SelectInfo filterColumn = filterInfo.filterColumn;
+		uint64_t constant = filterInfo.constant;
+		FilterInfo::Comparison comparison = filterInfo.comparison;
+
+		string comp;
+		if (comparison == 62) comp = ">";
+		else if (comparison == 60) comp = "<";
+		else comp = "=";
+
+		Utils::printLog("JOINER-QUERY-FILTER",
+			to_string(filterColumn.binding) + "." + to_string(filterColumn.colId) + " " + comp + " "
+				+ to_string(constant) +
+				" (r_id = " + to_string(filterColumn.binding) + ", col_id = " + to_string(filterColumn.colId) +
+				", comparison = " + comp + ", constant = " + to_string(constant) + ")");
+	}
+	Utils::printNewLine();
+
+	// Select
+	string selectList;
+	for (SelectInfo selectInfo : query.selections) {
+		string relationId = to_string(selectInfo.binding);
+		string columnId = to_string(selectInfo.colId);
+
+		selectList += relationId + "." + columnId + ", ";
+	}
+	Utils::printLog("JOINER-QUERY-SELECT", selectList.substr(0, selectList.size() - 2));
+	Utils::printNewLine();
+	/* ------------------------------------------------------------------- */
+
+	// cerr << query.dumpText() << endl;
+	set<unsigned> usedRelations;
 
 	// We always start with the first join predicate and append the other joins to it (--> left-deep join trees)
 	// You might want to choose a smarter join ordering ...
@@ -99,6 +139,9 @@ string Joiner::join(QueryInfo& query)
 	Utils::printLog("JOINER-JOIN-RIGHT_COL_ID", to_string(firstJoin.right.colId));
 	Utils::printLog("", "\n");
 
+	// Predicate 연산만 수행한다. (1 <= i < predicate.size()에 대해서 join을 수행하는 이유)
+	// Filter는 Predicate 연산 수행시, Filter 조건에 맞는 Relation과 Column이 있는 경우에만 수행된다.
+	// Predicate 연산 수행 전 Filter를 먼저 적용하여 탐색 범위를 줄이고 Predicate 연산을 수핸한다.
 	for (unsigned i = 1; i < query.predicates.size(); ++i) {
 		auto& pInfo = query.predicates[i];
 		auto& leftInfo = pInfo.left;

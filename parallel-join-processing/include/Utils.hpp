@@ -15,5 +15,6 @@ class Utils {
 	static void openLogFile(bool logFlag);
 	static void closeLogFile();
 	static void printLog(std::string role, std::string target);
+	static void printNewLine();
 };
 //---------------------------------------------------------------------------

@@ -26,7 +26,8 @@ int main(int argc, char* argv[]) {
 	QueryInfo i;
 	while (getline(cin, line)) {
 		// DEBUG :: Print Queries
-		Utils::printLog("MAIN-QUERIES", line + (line == "F" ? "\n" : ""));
+		Utils::printLog(">> MAIN-QUERIES", line);
+		Utils::printNewLine();
 
 		if (line == "F") continue; // End of a batch
 		i.parseQuery(line);

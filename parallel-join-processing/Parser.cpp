@@ -62,11 +62,13 @@ void QueryInfo::parsePredicate(string& rawPredicate)
 	assert(relCols.size() == 2);
 	assert(!isConstant(relCols[0]) && "left side of a predicate is always a SelectInfo");
 	auto leftSelect = parseRelColPair(relCols[0]);
+	// CASE: 1.0=3500 or 2.1 > 7000
 	if (isConstant(relCols[1])) {
 		uint64_t constant = stoul(relCols[1]);
 		char compType = rawPredicate[relCols[0].size()];
 		filters.emplace_back(leftSelect, constant, FilterInfo::Comparison(compType));
 	}
+	// CASE: 1.2=2.1 or 3.4=1.0
 	else {
 		predicates.emplace_back(leftSelect, parseRelColPair(relCols[1]));
 	}
