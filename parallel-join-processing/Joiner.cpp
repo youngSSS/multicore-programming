@@ -65,7 +65,7 @@ static QueryGraphProvides analyzeInputOfJoin(set<unsigned>& usedRelations, Selec
 string Joiner::join(QueryInfo& query)
 // Executes a join query
 {
-	/* --------------- DEBUG :: Print Information of Query --------------- */
+	/* ------------- DEBUG :: Print The Information of Query ------------- */
 	// Relation Id
 	string relationIdList;
 	for (auto q : query.relationIds) relationIdList += to_string(q) + ", ";
