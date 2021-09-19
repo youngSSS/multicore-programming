@@ -39,13 +39,13 @@ unique_ptr<Operator> Joiner::addScan(set<unsigned>& usedRelations, SelectInfo& i
 		}
 	}
 
-	Utils::print_log(true, "JOINER-ADDSCAN-BINDING", to_string(info.binding));
+	Utils::printLog("JOINER-ADDSCAN-BINDING", to_string(info.binding));
 	for (auto& f : filters)
-		Utils::print_log(true, "JOINER-ADDSCAN-FILTER", to_string(f.constant));
+		Utils::printLog("JOINER-ADDSCAN-FILTER", to_string(f.constant));
 	for (auto& f : query.filters) {
-		Utils::print_log(true, "JOINER-ADDSCAN-QUERY_FILTER", to_string(f.filterColumn.binding));
+		Utils::printLog("JOINER-ADDSCAN-QUERY_FILTER", to_string(f.filterColumn.binding));
 	}
-	Utils::print_log(true, "", "\n");
+	Utils::printLog("", "\n");
 
 	return !filters.empty() ? make_unique<FilterScan>(getRelation(info.relId), filters) : make_unique<Scan>(getRelation(
 		info.relId), info.binding);
@@ -75,14 +75,14 @@ string Joiner::join(QueryInfo& query)
 	set<unsigned> usedRelations;
 
 	for (auto q : query.relationIds)
-		Utils::print_log(true, "JOINER-RELATION_ID", to_string(q));
+		Utils::printLog("JOINER-RELATION_ID", to_string(q));
 //	for (auto q : query.predicates)
-//		Utils::print_log(true, "JOINER-RELATION_ID", q);
+//		Utils::printLog("JOINER-RELATION_ID", q);
 //	for (auto q : query.filters)
-//		Utils::print_log(true, "JOINER-RELATION_ID", q);
+//		Utils::printLog("JOINER-RELATION_ID", q);
 //	for (auto q : query.selections)
-//		Utils::print_log(true, "JOINER-RELATION_ID", q);
-	Utils::print_log(true, "", "\n");
+//		Utils::printLog("JOINER-RELATION_ID", q);
+	Utils::printLog("", "\n");
 
 	// We always start with the first join predicate and append the other joins to it (--> left-deep join trees)
 	// You might want to choose a smarter join ordering ...
@@ -91,13 +91,13 @@ string Joiner::join(QueryInfo& query)
 	auto right = addScan(usedRelations, firstJoin.right, query);
 	unique_ptr<Operator> root = make_unique<Join>(move(left), move(right), firstJoin);
 
-	Utils::print_log(true, "JOINER-JOIN-LEFT_REL_ID", to_string(firstJoin.left.relId));
-	Utils::print_log(true, "JOINER-JOIN-LEFT_BINDING", to_string(firstJoin.left.binding));
-	Utils::print_log(true, "JOINER-JOIN-LEFT_COL_ID", to_string(firstJoin.left.colId));
-	Utils::print_log(true, "JOINER-JOIN-RIGHT_REL_ID", to_string(firstJoin.right.relId));
-	Utils::print_log(true, "JOINER-JOIN-RIGHT_BINDING", to_string(firstJoin.right.binding));
-	Utils::print_log(true, "JOINER-JOIN-RIGHT_COL_ID", to_string(firstJoin.right.colId));
-	Utils::print_log(true, "", "\n");
+	Utils::printLog("JOINER-JOIN-LEFT_REL_ID", to_string(firstJoin.left.relId));
+	Utils::printLog("JOINER-JOIN-LEFT_BINDING", to_string(firstJoin.left.binding));
+	Utils::printLog("JOINER-JOIN-LEFT_COL_ID", to_string(firstJoin.left.colId));
+	Utils::printLog("JOINER-JOIN-RIGHT_REL_ID", to_string(firstJoin.right.relId));
+	Utils::printLog("JOINER-JOIN-RIGHT_BINDING", to_string(firstJoin.right.binding));
+	Utils::printLog("JOINER-JOIN-RIGHT_COL_ID", to_string(firstJoin.right.colId));
+	Utils::printLog("", "\n");
 
 	for (unsigned i = 1; i < query.predicates.size(); ++i) {
 		auto& pInfo = query.predicates[i];
@@ -105,38 +105,38 @@ string Joiner::join(QueryInfo& query)
 		auto& rightInfo = pInfo.right;
 		unique_ptr<Operator> left, right;
 
-		Utils::print_log(true, "JOINER-JOIN-LEFT_REL_ID", to_string(pInfo.left.relId));
-		Utils::print_log(true, "JOINER-JOIN-LEFT_BINDING", to_string(pInfo.left.binding));
-		Utils::print_log(true, "JOINER-JOIN-LEFT_COL_ID", to_string(pInfo.left.colId));
-		Utils::print_log(true, "JOINER-JOIN-RIGHT_REL_ID", to_string(pInfo.right.relId));
-		Utils::print_log(true, "JOINER-JOIN-RIGHT_BINDING", to_string(pInfo.right.binding));
-		Utils::print_log(true, "JOINER-JOIN-RIGHT_COL_ID", to_string(pInfo.right.colId));
-		Utils::print_log(true, "", "\n");
+		Utils::printLog("JOINER-JOIN-LEFT_REL_ID", to_string(pInfo.left.relId));
+		Utils::printLog("JOINER-JOIN-LEFT_BINDING", to_string(pInfo.left.binding));
+		Utils::printLog("JOINER-JOIN-LEFT_COL_ID", to_string(pInfo.left.colId));
+		Utils::printLog("JOINER-JOIN-RIGHT_REL_ID", to_string(pInfo.right.relId));
+		Utils::printLog("JOINER-JOIN-RIGHT_BINDING", to_string(pInfo.right.binding));
+		Utils::printLog("JOINER-JOIN-RIGHT_COL_ID", to_string(pInfo.right.colId));
+		Utils::printLog("", "\n");
 
 		switch (analyzeInputOfJoin(usedRelations, leftInfo, rightInfo)) {
 		case QueryGraphProvides::Left:
-			Utils::print_log(true, "JOINER-JOIN-QUERY_GRAPH_PROVIDES", "LEFT");
+			Utils::printLog("JOINER-JOIN-QUERY_GRAPH_PROVIDES", "LEFT");
 
 			left = move(root);
 			right = addScan(usedRelations, rightInfo, query);
 			root = make_unique<Join>(move(left), move(right), pInfo);
 			break;
 		case QueryGraphProvides::Right:
-			Utils::print_log(true, "JOINER-JOIN-QUERY_GRAPH_PROVIDES", "RIGHT");
+			Utils::printLog("JOINER-JOIN-QUERY_GRAPH_PROVIDES", "RIGHT");
 
 			left = addScan(usedRelations, leftInfo, query);
 			right = move(root);
 			root = make_unique<Join>(move(left), move(right), pInfo);
 			break;
 		case QueryGraphProvides::Both:
-			Utils::print_log(true, "JOINER-JOIN-QUERY_GRAPH_PROVIDES", "BOTH");
+			Utils::printLog("JOINER-JOIN-QUERY_GRAPH_PROVIDES", "BOTH");
 
 			// All relations of this join are already used somewhere else in the query.
 			// Thus, we have either a cycle in our join graph or more than one join predicate per join.
 			root = make_unique<SelfJoin>(move(root), pInfo);
 			break;
 		case QueryGraphProvides::None:
-			Utils::print_log(true, "JOINER-JOIN-QUERY_GRAPH_PROVIDES", "NONE");
+			Utils::printLog("JOINER-JOIN-QUERY_GRAPH_PROVIDES", "NONE");
 
 			// Process this predicate later when we can connect it to the other joins
 			// We never have cross products

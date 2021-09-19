@@ -35,18 +35,19 @@ void Utils::storeRelation(ofstream& out, Relation& r, unsigned i)
 }
 //---------------------------------------------------------------------------
 /* --------------------- Write output stream to file --------------------- */
-ofstream write_file;
-void Utils::open_log_file() {
-	write_file.open("../log.txt", std::ios::trunc);
+ofstream logFile;
+bool logFlag = true;
+void Utils::openLogFile(bool flag) {
+	logFile.open("../log.txt", std::ios::trunc);
 }
-void Utils::close_log_file() {
-	write_file.close();
+void Utils::closeLogFile() {
+	logFile.close();
 }
-void Utils::print_log(bool flag, string role, string target) {
-	if (!flag) return;
+void Utils::printLog(string role, string target) {
+	if (!logFlag) return;
 
 	string output = role + " :: " + target + "\n";
-	if (write_file.is_open())
-		write_file.write(output.c_str(), output.size());
+	if (logFile.is_open())
+		logFile.write(output.c_str(), output.size());
 }
 /* ----------------------------------------------------------------------- */

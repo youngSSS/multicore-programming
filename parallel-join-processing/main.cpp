@@ -8,13 +8,13 @@ using namespace std;
 int main(int argc, char* argv[]) {
 	Joiner joiner;
 
-	Utils::open_log_file();
+	Utils::openLogFile(true);
 
 	// Read join relations
 	string line;
 	while (getline(cin, line)) {
 		// DEBUG :: Print Relations
-		Utils::print_log(true, "MAIN-RELATIONS", line + (line == "Done" ? "\n" : ""));
+		Utils::printLog("MAIN-RELATIONS", line + (line == "Done" ? "\n" : ""));
 
 		if (line == "Done") break;
 		joiner.addRelation(line.c_str());
@@ -26,16 +26,16 @@ int main(int argc, char* argv[]) {
 	QueryInfo i;
 	while (getline(cin, line)) {
 		// DEBUG :: Print Queries
-		Utils::print_log(true, "MAIN-QUERIES", line + (line == "F" ? "\n" : ""));
+		Utils::printLog("MAIN-QUERIES", line + (line == "F" ? "\n" : ""));
 
 		if (line == "F") continue; // End of a batch
 		i.parseQuery(line);
 		string join_result = joiner.join(i);
 		cout << join_result;
-		Utils::print_log(true, "MAIN-QUERIES_OUTPUT", join_result);
+		Utils::printLog("MAIN-QUERIES_OUTPUT", join_result);
 	}
 
-	Utils::close_log_file();
+	Utils::closeLogFile();
 
 	return 0;
 }
