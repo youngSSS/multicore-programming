@@ -155,7 +155,5 @@ string Joiner::getJoinResults() {
 	// Cleanup
 	joinResults.clear();
 
-	cerr << retVal << endl;
-
 	return retVal;
 }
