@@ -10,11 +10,5 @@ class Utils {
 
 	/// Store a relation in all formats
 	static void storeRelation(std::ofstream& out, Relation& r, unsigned i);
-
-	/// Log file for debugging
-	static void openLogFile(bool logFlag);
-	static void closeLogFile();
-	static void printLog(std::string role, std::string target);
-	static void printNewLine();
 };
 //---------------------------------------------------------------------------

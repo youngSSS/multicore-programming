@@ -8,14 +8,9 @@ using namespace std;
 int main(int argc, char* argv[]) {
 	Joiner joiner;
 
-	Utils::openLogFile(true);
-
 	// Read join relations
 	string line;
 	while (getline(cin, line)) {
-		// DEBUG :: Print Relations
-		Utils::printLog("MAIN-RELATIONS", line + (line == "Done" ? "\n" : ""));
-
 		if (line == "Done") break;
 		joiner.addRelation(line.c_str());
 	}
@@ -23,20 +18,15 @@ int main(int argc, char* argv[]) {
 	// Preparation phase (not timed)
 	// Build histograms, indexes,...
 
-	QueryInfo i;
+	QueryInfo queryInfo;
 	while (getline(cin, line)) {
-		// DEBUG :: Print Queries
-		Utils::printLog(">> MAIN-QUERIES", line);
-		Utils::printNewLine();
+		if (line == "F") {
+			cout << joiner.getJoinResults();
+			continue;
+		};
 
-		if (line == "F") continue; // End of a batch
-		i.parseQuery(line);
-		string join_result = joiner.join(i);
-		cout << join_result;
-		Utils::printLog("MAIN-QUERIES_OUTPUT", join_result);
+		joiner.startJoinThread(line);
 	}
-
-	Utils::closeLogFile();
 
 	return 0;
 }
