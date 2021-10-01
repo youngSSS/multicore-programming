@@ -141,6 +141,8 @@ void Joiner::startJoinThread(string line) {
 	threadIndex += 1;
 	joinResults.emplace_back();
 
+	// Boost bind
+	// https://www.boost.org/doc/libs/1_75_0/libs/bind/doc/html/bind.html
 	ioService.post(boost::bind(&Joiner::join, this, queryInfo, threadIndex));
 }
 
