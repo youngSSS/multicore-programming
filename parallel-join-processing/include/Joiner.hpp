@@ -18,9 +18,8 @@ class Joiner {
 	/// Add scan to query
 	std::unique_ptr<Operator> addScan(std::set<unsigned>& usedRelations, SelectInfo& info, QueryInfo& query);
 
-	// Boost
-	// 1. How to create thread pool
-	// -> https://coderedirect.com/questions/116779/how-to-create-a-thread-pool-using-boost-in-c
+	// Boost thread pool
+	// https://coderedirect.com/questions/116779/how-to-create-a-thread-pool-using-boost-in-c
 	boost::asio::io_service ioService;
 	boost::thread_group threadPool;
 	boost::asio::io_service::work work;

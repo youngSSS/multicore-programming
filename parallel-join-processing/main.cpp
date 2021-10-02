@@ -20,10 +20,12 @@ int main(int argc, char* argv[]) {
 	QueryInfo queryInfo;
 	while (getline(cin, line)) {
 		if (line == "F") {
+			// Print the result of join set
 			cout << joiner.getJoinResults();
 			continue;
 		};
 
+		// Start join thread with single join request
 		joiner.startJoinThread(line);
 	}
 

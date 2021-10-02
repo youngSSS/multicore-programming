@@ -125,6 +125,7 @@ void Joiner::join(QueryInfo& query, int threadIdx)
 	}
 	out << "\n";
 
+	// Collect results by starting order
 	joinResults[threadIdx] = out.str();
 
 	// Decrease Thread Index
@@ -134,23 +135,28 @@ void Joiner::join(QueryInfo& query, int threadIdx)
 	_mutex.unlock();
 }
 //---------------------------------------------------------------------------
+
+//------------------------------ New Functions ------------------------------
 void Joiner::startJoinThread(string line) {
 	QueryInfo queryInfo;
 	queryInfo.parseQuery(line);
 
+	// Set thread index to collect the result by order
 	threadIndex += 1;
 	joinResults.emplace_back();
 
 	// Boost bind
 	// https://www.boost.org/doc/libs/1_75_0/libs/bind/doc/html/bind.html
+	// https://www.boost.org/doc/libs/1_54_0/libs/bind/bind.html#with_functions
 	ioService.post(boost::bind(&Joiner::join, this, queryInfo, threadIndex));
 }
 
 string Joiner::getJoinResults() {
-	// Wait until all thread finish work
+	// Wait until all the threads are done
 	while (threadIndex != -1)
 		cond.notify_one();
 
+	// Combine results to a single string
 	string retVal;
 	for (string& result : joinResults) retVal += result;
 
@@ -159,3 +165,4 @@ string Joiner::getJoinResults() {
 
 	return retVal;
 }
+//---------------------------------------------------------------------------
