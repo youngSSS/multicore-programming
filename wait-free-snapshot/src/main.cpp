@@ -21,6 +21,7 @@ int main(int argc, char** argv) {
     }
 
     int numThread = atoi(argv[1]);
+    temp();
     
     return 0;
 }
