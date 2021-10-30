@@ -1,16 +1,26 @@
 # Wait-free Snapshot
 
-## Logic
+This is the WIKI of `Wait-free Snapshot`.
 
-### Snapshot
+# Logic
 
-Snapshot is needed to keep a track of linearizable point.
+## Snapshot
 
-### At most three
+The snapshot is needed to keep a track of the linearizable point.
 
-We cannot find linearizable schedule.
+## At most three collect
+
+### Why we cannot finish in two collect
+
+When we fail to pick a snapshot at once, we pick the other updater's snapshot as ours.
+
+In this case, if we finish on the second try, we cannot know whether the other updater's snapshot had been made after our invocation or not. If we pick the snapshot which had been made before our invocation, we cannot find a linearizable schedule.
+
+Therefore by picking the snapshot on the third try, we can guarantee that snapshot had been made after our invocation.
 
 <br/>
+
+# Source Code
 
 ## TestRunner.hpp
 
@@ -40,11 +50,17 @@ Method `update(updateValue, threadId)` updates the local value of the thread. It
 
 <br/>
 
-## Result
+# Result
 
-- Run with 1 thread -> 18,205,259
-- Run with 2 thread -> 27,664,085
-- Run with 4 thread -> 37,446,084
-- Run with 8 thread -> 30,980,002
-- Run with 16 thread -> 19,102,499
-- Run with 32 thread -> 8,652,252
+- Case 1: Run with 1 thread -> 18,205,259
+- Case 2: Run with 2 thread -> 27,664,085
+- Case 3: Run with 4 thread -> 37,446,084
+- Case 4: Run with 8 thread -> 30,980,002
+- Case 5: Run with 16 thread -> 19,102,499
+- Case 6: Run with 32 thread -> 8,652,252
+
+## Analysis
+
+From case 1 to case 3, the number of updates has been increased. Because many threads work together and there are only a few conflicts.
+
+But from case 3 to case 6, the number of updates has been decreased. It is expected to increase because more threads work together, but at the same time, the number of conflicts has been increased too, as a result, the number of updates has been decreased.
