@@ -7,6 +7,7 @@
 #include "WaitFreeSnapshot.hpp"
 
 #define EXECUTION_TIME 10
+#define UPDATE_VALUE_RANGE 10000
 
 using namespace std;
 
@@ -23,7 +24,7 @@ class TestRunner {
         void updateTest(WaitFreeSnapshot* wfs, int tid, int* exitFlag) {
             while (!*exitFlag) {
                 srand((unsigned int)time(nullptr));
-                int randomValue = rand() % 10000;
+                int randomValue = rand() % UPDATE_VALUE_RANGE;
 
                 wfs->update(randomValue, tid);
 
