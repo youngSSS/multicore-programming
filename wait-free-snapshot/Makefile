@@ -22,10 +22,10 @@ TARGET=run
 all: $(TARGET)
 
 $(TARGET): $(TARGET_OBJ) $(STATIC_LIB)
-	$(CC) $(CFLAGS) $< -o $@ -L $(LIBS) -lwfs -lpthread
+	$(CC) $(CFLAGS) $< -o $@ -L $(LIBS) $(BOOST_INC) -lwfs -lboost_system -lboost_thread-mt -lpthread
 
 %.o: %.cpp
-	$(CC) $(CFLAGS) $^ -c -o $@ -lpthread
+	$(CC) $(CFLAGS) $^ -c -o $@ $(BOOST_INC)
 
 clean:
 	rm $(TARGET) $(TARGET_OBJ) $(OBJS_FOR_LIB) $(LIBS)*

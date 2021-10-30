@@ -1,7 +1,4 @@
-#include <iostream>
-#include "WaitFreeSnapshot.hpp"
-
-using namespace std;
+#include "TestRunner.hpp"
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -9,7 +6,7 @@ int main(int argc, char** argv) {
              << "- The execution format should be like the last line.\n"
              << "- N is the number of worker threads.\n"
              << "\n./run N\n" << endl;
-        return 0;
+        return 1;
     }
 
     if (isdigit(argv[1][0]) == 0) {
@@ -17,11 +14,12 @@ int main(int argc, char** argv) {
              << "- The execution format should be like the last line.\n"
              << "- N should be the \"NUMBER\" of worker threads.\n"
              << "\n./run N\n" << endl;
-        return 0;
+        return 1;
     }
 
-    int numThread = atoi(argv[1]);
-    temp();
+    TestRunner* testRunner = new TestRunner(atoi(argv[1]));
+    testRunner->startUpdateTest();
+    delete testRunner;
     
     return 0;
 }
