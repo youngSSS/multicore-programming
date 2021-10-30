@@ -2,6 +2,8 @@
 
 This is the WIKI of `Wait-free Snapshot`.
 
+<br/>
+
 # Logic
 
 ## Snapshot
