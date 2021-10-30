@@ -6,7 +6,7 @@
 
 #include "WaitFreeSnapshot.hpp"
 
-#define EXECUTION_TIME 10
+#define EXECUTION_TIME 60
 #define UPDATE_VALUE_RANGE 10000
 
 using namespace std;
