@@ -30,8 +30,6 @@ Therefore by picking the snapshot on the third try, we can guarantee that snapsh
 
 In class `TestRunner`, method `startUpdateTest()` updates each thread's local value to random value for 1 minute.
 
-<br/>
-
 ## WaitFreeSnapshot.hpp
 
 ### CLASS - SnapValue
