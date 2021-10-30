@@ -2,13 +2,21 @@
 
 ## Logic
 
+### Snapshot
+
+Snapshot is needed to keep a track of linearizable point.
+
+### At most three
+
+We cannot find linearizable schedule.
+
 <br/>
 
 ## TestRunner.hpp
 
 ### CLASS - TestRunner
 
-In `TestRunner` class, `startUpdateTest()` function updates each thread's local value for 1 minute.
+In class `TestRunner`, method `startUpdateTest()` updates each thread's local value to random value for 1 minute.
 
 <br/>
 
@@ -16,21 +24,19 @@ In `TestRunner` class, `startUpdateTest()` function updates each thread's local 
 
 ### CLASS - SnapValue
 
-Class `SnapValue` has a label, value, and snapshot.
-
-The variable `label` is the unique number for update.
+The variable `label` is the unique number to distinguish updates. Without `label`, we cannot recognize whether an update happened or not when the updated value is the same as the old one.
 
 The variable `value` is the local value of the thread.
 
-The variable `snapshot` is the latest valid snapshot of the thread.
+The variable `snapshot` is the latest valid snapshot of the system.
 
 ### CLASS - WaitFreeSnapshot
 
-The variable `snapValues` is the status of whole threads.
+The variable `snapValues` is the status of the system. It has the whole status of each thread (`snapValue`).
 
-Method `scan` scans `snapValues`.
+Method `scan()` scans the status of the system and returns the latest valid snapshot of the system.
 
-Method `update` updates the local value of the thread. It should take a snapshot before it updates the local value.
+Method `update(updateValue, threadId)` updates the local value of the thread. It should take a snapshot before updating.
 
 <br/>
 
