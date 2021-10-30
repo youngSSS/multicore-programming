@@ -16,21 +16,21 @@ In `TestRunner` class, `startUpdateTest()` function updates each thread's local 
 
 ### CLASS - SnapValue
 
-Class `SnapValue` has label, value, and snapshot.
+Class `SnapValue` has a label, value, and snapshot.
 
-Variable `label` is the unique number for update.
+The variable `label` is the unique number for update.
 
-Variable `value` is the local value of thread.
+The variable `value` is the local value of the thread.
 
-Variable `snapshot` is the latest valid snapshot of thread.
+The variable `snapshot` is the latest valid snapshot of the thread.
 
 ### CLASS - WaitFreeSnapshot
 
-Variable `snapValues` is the status of whole threads.
+The variable `snapValues` is the status of whole threads.
 
 Method `scan` scans `snapValues`.
 
-Method `update` updates the local value of thread. It should take snapshot before updates the local value.
+Method `update` updates the local value of the thread. It should take a snapshot before it updates the local value.
 
 <br/>
 
