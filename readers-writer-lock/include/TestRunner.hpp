@@ -11,16 +11,18 @@ using namespace std;
 
 class TestRunner {
  private:
-	int numTread;
+	int numThread;
 	int numRecord;
 	int numExecution;
+
+
 
 	boost::asio::io_service ioService;
 	boost::asio::io_service::work work;
 	boost::thread_group threadPool;
 
  public:
-	TestRunner(int numThread) : wfs(new WaitFreeSnapshot(numThread)), numThread(numThread), work(ioService) {
+	TestRunner(int t, int r, int e) : wfs(new WaitFreeSnapshot(numThread)), numThread(t), numRecord(r), numExecution(e), work(ioService) {
 		for (int i = 0; i < numThread; i++)
 			threadPool.create_thread(boost::bind(&boost::asio::io_service::run, &ioService));
 	}
