@@ -7,7 +7,12 @@ using namespace std;
 
 class Database {
  private:
-	vector<int64_t>
+	vector<int64_t> database;
+
+ public:
+	Database(int numRecord) {
+		database.resize(numRecord, 100);
+	}
 
 };
 

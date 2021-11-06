@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
 
 	cout << numTread << " " << numRecord << " " << numExecution << endl;
 
-	TestRunner* testRunner = new TestRunner();
+	auto* testRunner = new TestRunner(numTread, numRecord, numExecution);
 	testRunner->startReaderWriterTest();
 	delete testRunner;
 
