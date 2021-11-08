@@ -2,7 +2,7 @@
 
 using namespace std;
 
-int argvValidator(int value) {
+int isArgvInvalid(int value) {
 	if (isdigit(value) == 0) {
 		cerr << "************** Execution Format ERROR **************\n"
 			 << "- The execution format should be like the last line.\n"
@@ -19,9 +19,9 @@ int argvValidator(int value) {
 
 int main(int argc, char** argv) {
 	// Check arguments
-	if (argvValidator(argv[1][0])) return 1;
-	if (argvValidator(argv[2][0])) return 1;
-	if (argvValidator(argv[3][0])) return 1;
+	if (isArgvInvalid(argv[1][0])) return 1;
+	if (isArgvInvalid(argv[2][0])) return 1;
+	if (isArgvInvalid(argv[3][0])) return 1;
 
 	int numTread = atoi(argv[1]);
 	int numRecord = atoi(argv[2]);

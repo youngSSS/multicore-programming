@@ -3,9 +3,11 @@
 
 #include <iostream>
 #include <vector>
+#include <random>
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>
+#include <unordered_map>
 
 #include "Database.hpp"
 #include "ConcurrencyControl.hpp"
@@ -26,8 +28,33 @@ class TestRunner {
 	boost::asio::io_service::work work;
 	boost::thread_group threadPool;
 
-	void testRootine() {
+	vector<int> getRandomRecordIdx() {
+		vector<int> recordIdx;
 
+		random_device rd;
+		mt19937 gen(rd());
+		uniform_int_distribution<int> dis(0, numRecord - 1);
+
+		while (recordIdx.size() < 3) {
+			int idx = dis(gen);
+			if (find(recordIdx.begin(), recordIdx.end(), idx) == recordIdx.end())
+				recordIdx.push_back(idx);
+		}
+
+		return recordIdx;
+	}
+
+	void testRoutine() {
+		vector<int> recordIdx = getRandomRecordIdx();
+		int i = recordIdx[0];
+		int j = recordIdx[1];
+		int k = recordIdx[2];
+
+		int trxId = transaction->trxBegin();
+		int readValue = transaction->trxRead(trxId, i);
+		transaction->trxWrite(trxId, j, readValue + 1);
+		transaction->trxWrite(trxId, k, -readValue);
+		transaction->trxCommit(trxId);
 	}
 
  public:
@@ -50,6 +77,11 @@ class TestRunner {
 
 	void startReaderWriterTest() {
 
+		for (int tid = 0; tid < numThread; tid++)
+			ioService.post(boost::bind(&TestRunner::testRoutine, this));
+
+//		ioService.stop();
+		threadPool.join_all();
 	}
 
 };
