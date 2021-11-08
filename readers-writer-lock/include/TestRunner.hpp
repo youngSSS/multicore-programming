@@ -44,7 +44,7 @@ class TestRunner {
 		return recordIdx;
 	}
 
-	void testRoutine() {
+	void readerWriterTestRoutine() {
 		vector<int> recordIdx = getRandomRecordIdx();
 		int i = recordIdx[0];
 		int j = recordIdx[1];
@@ -78,7 +78,7 @@ class TestRunner {
 	void startReaderWriterTest() {
 
 		for (int tid = 0; tid < numThread; tid++)
-			ioService.post(boost::bind(&TestRunner::testRoutine, this));
+			ioService.post(boost::bind(&TestRunner::readerWriterTestRoutine, this));
 
 //		ioService.stop();
 		threadPool.join_all();

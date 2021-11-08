@@ -1,6 +1,6 @@
 #include "ConcurrencyControl.hpp"
 
-int Lock::acquireRecordMutex(int trxId, int rid, int lockMode) {
+lock_t* Lock::acquireRecordMutex(int trxId, int rid, int lockMode) {
 
 }
 

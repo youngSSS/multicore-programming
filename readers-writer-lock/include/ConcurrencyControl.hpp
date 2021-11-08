@@ -3,12 +3,13 @@
 
 #include "Database.hpp"
 
+#include <unordered_map>
 #include <boost/thread.hpp>
 
 #define S_MODE 0
 #define X_MODE 1
 
-#define DEADLOCK 1
+#define DEADLOCK nullptr
 
 using namespace std;
 
@@ -20,27 +21,39 @@ struct lock_t {
 	int lockMode;
 	int isWaiting;
 
-	lock_t* prev;
-	lock_t* next;
+	lock_t* prev = nullptr;
+	lock_t* next = nullptr;
 
 	boost::condition_variable cond;
 };
 
 struct trx_t {
 	int trxId;
-	lock_t* prev;
-	lock_t* next;
+	lock_t* prev = nullptr;
+	lock_t* next = nullptr;
+
+	trx_t(int id, lock_t* p, lock_t* n) : trxId(id), prev(p), next(n) {}
+};
+
+struct trxHeader_t {
+	lock_t* head;
+	lock_t* tail;
+
+	trxHeader_t() : head(nullptr), tail(nullptr) {}
 };
 
 class Transaction {
  private:
 	Database* database;
 	Lock* lockManager;
+
+	unordered_map<int, trxHeader_t*> trxTable;
 	int trxIdSeq;
 
 	boost::mutex trxIdSeqMutex;
 
 	void handleDeadlock();
+	void updateTrxTable(int trxId, lock_t* lockObj);
 
  public:
 	// Constructor
@@ -66,7 +79,7 @@ class Lock {
 	Lock(Database* db, Transaction* t) : database(db), trxManager(t) {}
 
 	// Lock methods
-	int acquireRecordMutex(int trxId, int rid, int lockMode);
+	lock_t* acquireRecordMutex(int trxId, int rid, int lockMode);
 	void releaseRecordMutex(int trxId, int rid, int lockMode);
 
 	static void acquireLockTableMutex();
