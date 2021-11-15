@@ -1,4 +1,4 @@
-#include "TestRunner.hpp"
+#include "TwoPhaseLockingRunner.hpp"
 
 using namespace std;
 
@@ -27,11 +27,9 @@ int main(int argc, char** argv) {
 	int numRecord = atoi(argv[2]);
 	int numExecution = atoi(argv[3]);
 
-	cout << numTread << " " << numRecord << " " << numExecution << endl;
-
-	auto* testRunner = new TestRunner(numTread, numRecord, numExecution);
-	testRunner->startReaderWriterTest();
-	delete testRunner;
+	auto* twoPhaseLockingRunner = new TwoPhaseLockingRunner(numTread, numRecord, numExecution);
+	twoPhaseLockingRunner->startReadersWriterTest();
+	delete twoPhaseLockingRunner;
 
 	return 0;
 }

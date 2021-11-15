@@ -1,5 +1,5 @@
-#ifndef READERS_WRITER_LOCK_INCLUDE_TESTRUNNER_HPP_
-#define READERS_WRITER_LOCK_INCLUDE_TESTRUNNER_HPP_
+#ifndef READERS_WRITER_LOCK_INCLUDE_TWOPHASELOCKINGRUNNER_HPP_
+#define READERS_WRITER_LOCK_INCLUDE_TWOPHASELOCKINGRUNNER_HPP_
 
 #include <iostream>
 #include <vector>
@@ -14,7 +14,7 @@
 
 using namespace std;
 
-class TestRunner {
+class TwoPhaseLockingRunner {
  private:
 	int numThread;
 	int numRecord;
@@ -28,7 +28,8 @@ class TestRunner {
 	boost::asio::io_service::work work;
 	boost::thread_group threadPool;
 
-	vector<int> getRandomRecordIdx() {
+	// Test routine
+	void readersWriterRoutine(int tid) {
 		vector<int> recordIdx;
 
 		random_device rd;
@@ -41,44 +42,36 @@ class TestRunner {
 				recordIdx.push_back(idx);
 		}
 
-		return recordIdx;
-	}
-
-	void readerWriterTestRoutine() {
-		vector<int> recordIdx = getRandomRecordIdx();
-		int i = recordIdx[0];
-		int j = recordIdx[1];
-		int k = recordIdx[2];
-
-		int trxId = transaction->trxBegin();
-		int readValue = transaction->trxRead(trxId, i);
-		transaction->trxWrite(trxId, j, readValue + 1);
-		transaction->trxWrite(trxId, k, -readValue);
-		transaction->trxCommit(trxId);
+		transaction->startTrx(recordIdx, tid);
 	}
 
  public:
-	TestRunner(int t, int r, int e) : numThread(t), numRecord(r), numExecution(e), work(ioService) {
+	// Constructor
+	TwoPhaseLockingRunner(int t, int r, int e) : numThread(t), numRecord(r), numExecution(e), work(ioService) {
 		// Initialize
 		database = new Database(r);
-		transaction = new Transaction(database, lock);
-		lock = new Lock(database, transaction);
+		transaction = new Transaction(database, numExecution);
+		lock = new Lock(database);
+
+		transaction->setLockManager(lock);
+		lock->setTrxManager(transaction);
 
 		// Make thread pool
 		for (int i = 0; i < numThread; i++)
 			threadPool.create_thread(boost::bind(&boost::asio::io_service::run, &ioService));
 	}
 
-	~TestRunner() {
+	// Destructor
+	~TwoPhaseLockingRunner() {
 		delete database;
 		delete transaction;
 		delete lock;
 	}
 
-	void startReaderWriterTest() {
-
-		for (int tid = 0; tid < numThread; tid++)
-			ioService.post(boost::bind(&TestRunner::readerWriterTestRoutine, this));
+	// Test method
+	void startReadersWriterTest() {
+		for (int tid = 1; tid <= numThread; tid++)
+			ioService.post(boost::bind(&TwoPhaseLockingRunner::readersWriterRoutine, this, tid));
 
 //		ioService.stop();
 		threadPool.join_all();
@@ -86,4 +79,4 @@ class TestRunner {
 
 };
 
-#endif //READERS_WRITER_LOCK_INCLUDE_TESTRUNNER_HPP_
+#endif //READERS_WRITER_LOCK_INCLUDE_TWOPHASELOCKINGRUNNER_HPP_
