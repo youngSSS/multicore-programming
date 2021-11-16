@@ -36,13 +36,17 @@ class TwoPhaseLockingRunner {
 		mt19937 gen(rd());
 		uniform_int_distribution<int> dis(0, numRecord - 1);
 
-		while (recordIdx.size() < 3) {
-			int idx = dis(gen);
-			if (find(recordIdx.begin(), recordIdx.end(), idx) == recordIdx.end())
-				recordIdx.push_back(idx);
-		}
+		int result = 0;
+		while (result == 0) {
+			while (recordIdx.size() < 3) {
+				int idx = dis(gen);
+				if (find(recordIdx.begin(), recordIdx.end(), idx) == recordIdx.end())
+					recordIdx.push_back(idx);
+			}
 
-		transaction->startTrx(recordIdx, tid);
+			result = transaction->startTrx(recordIdx, tid);
+			recordIdx.clear();
+		}
 	}
 
  public:
@@ -59,6 +63,12 @@ class TwoPhaseLockingRunner {
 		// Make thread pool
 		for (int i = 0; i < numThread; i++)
 			threadPool.create_thread(boost::bind(&boost::asio::io_service::run, &ioService));
+
+		// Initialize the file data
+		for (int i = 1; i <= numThread; i++) {
+			ofstream fout("thread" + to_string(i) + ".txt");
+			fout.close();
+		}
 	}
 
 	// Destructor

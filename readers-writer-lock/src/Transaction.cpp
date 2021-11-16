@@ -16,25 +16,30 @@ void Transaction::updateTrxTable(int trxId, lock_t* lockObj) {
 
 void Transaction::releaseAcquiredLocks(int trxId) {
 	lock_t* lockObj = trxTable[trxId]->head;
+	lock_t* nextLockObj;
 
 	while (lockObj != nullptr) {
+		nextLockObj = lockObj->lNext;
 		lockManager->releaseRecordLock(lockObj);
-		lockObj = lockObj->tNext;
+		lockObj = nextLockObj;
 	}
 }
 
 int Transaction::trxBegin() {
-	int id;
+	// Acquire the global mutex
+	lockManager->acquireLockTableMutex();
 
-	trxIdSeqMutex.lock();
-	id = trxIdSeq++;
+	int id = trxIdSeq++;
 	trxTable[id] = new trxTable_t(id);
-	trxIdSeqMutex.unlock();
+
+	// Release the global mutex
+	lockManager->releaseLockTableMutex();
 
 	return id;
 }
 
-void Transaction::trxCommit(int trxId, vector<int> recordIdx) {
+int Transaction::trxCommit(int trxId, vector<int> recordIdx) {
+	// Acquire the global mutex
 	lockManager->acquireLockTableMutex();
 
 	// Two-phase locking, release acquired locks
@@ -43,7 +48,7 @@ void Transaction::trxCommit(int trxId, vector<int> recordIdx) {
 	// Increase the global execution order by 1
 	int commitId = ++numExecution;
 
-	// Case: Commit count exceeds execution limit
+	// Case: Commit count exceeds a execution limit
 	if (commitId > executionLimit) {
 		// Undo phase
 		for (auto undoItem : trxTable[trxId]->undoLog)
@@ -53,24 +58,31 @@ void Transaction::trxCommit(int trxId, vector<int> recordIdx) {
 
 		lockManager->releaseLockTableMutex();
 
-		return;
+		return 1;
 	}
 
-	// Append commit log
+	// Append results to the commit log
 	ofstream fout("thread" + to_string(threadId) + ".txt", ios::app);
 	fout << commitId << " ";
 	for (auto idx : recordIdx)
 		fout << idx << " ";
 	for (auto h : trxTable[trxId]->history)
 		fout << h << " ";
+	fout << "\n\n";
 	fout.close();
 
+	// Delete a transaction from trxTable
 	delete trxTable[trxId];
+	trxTable.erase(trxId);
 
+	// Release the global mutex
 	lockManager->releaseLockTableMutex();
+
+	return 0;
 }
 
 void Transaction::trxRollback(int trxId) {
+	// Acquire the global mutex
 	lockManager->acquireLockTableMutex();
 
 	// Undo phase
@@ -80,50 +92,68 @@ void Transaction::trxRollback(int trxId) {
 	// Two-phase locking, release acquired locks
 	releaseAcquiredLocks(trxId);
 
+	// Delete a transaction from trxTable
 	delete trxTable[trxId];
+	trxTable.erase(trxId);
 
+	// Release the global mutex
 	lockManager->releaseLockTableMutex();
 }
 
 int64_t Transaction::trxRead(int trxId, int rid, int* deadlockFlag) {
+	// Acquire the global mutex
 	lockManager->acquireLockTableMutex();
 
+	// Acquire the record lock
 	lock_t* lockObj = lockManager->acquireRecordLock(trxId, rid, S_MODE);
+
+	// Case: Deadlock
 	if (lockObj == DEADLOCK) {
 		*deadlockFlag = 1;
+		// Release the global mutex
+		lockManager->releaseLockTableMutex();
 		return 0;
 	}
+	// Case: Success to acquire the record lock
 	else {
-		// Logging operation result for commit log
+		// Save result for commit log
 		trxTable[trxId]->history.push_back(lockObj->lSentinel->key);
 	}
 
+	// Release the global mutex
 	lockManager->releaseLockTableMutex();
 
 	return database->readRecord(rid);
 }
 
 void Transaction::trxWrite(int trxId, int rid, int64_t value, int* deadlockFlag) {
+	// Acquire the global mutex
 	lockManager->acquireLockTableMutex();
 
+	// Acquire the record lock
 	lock_t* lockObj = lockManager->acquireRecordLock(trxId, rid, X_MODE);
 
+	// Case: Deadlock
 	if (lockObj == DEADLOCK) {
 		*deadlockFlag = 1;
+		// Release the global mutex
+		lockManager->releaseLockTableMutex();
 		return;
 	}
+	// Case: Success to acquire the record lock
 	else {
-		// Logging oldest value
+		// Save oldest value for undo
 		if (trxTable[trxId]->undoLog.find(rid) == trxTable[trxId]->undoLog.end())
 			trxTable[trxId]->undoLog[rid] = lockObj->lSentinel->key;
 
 		// Update lock object's key value
 		lockObj->lSentinel->key += value;
 
-		// Logging operation result for commit log
+		// Save result for commit log
 		trxTable[trxId]->history.push_back(lockObj->lSentinel->key);
 	}
 
+	// Release the global mutex
 	lockManager->releaseLockTableMutex();
 
 	database->updateRecord(rid, lockObj->lSentinel->key);
@@ -156,11 +186,9 @@ int Transaction::startTrx(vector<int> recordIdx, int tid) {
 			continue;
 		}
 
-		trxCommit(trxId, recordIdx);
-		break;
+		delete deadlockFlag;
+		return trxCommit(trxId, recordIdx);
 	}
-
-	delete deadlockFlag;
 }
 
 void Transaction::setLockManager(Lock* l) {

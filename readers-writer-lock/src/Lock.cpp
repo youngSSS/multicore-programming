@@ -2,6 +2,7 @@
 
 vector<int> Lock::getTrxWaitingList(lock_t* lockObj) {
 	vector<int> trxWaitingList;
+	int trxId = lockObj->tSentinel->trxId;
 
 	// Case: lockObj is working
 	if (lockObj->condition == WORKING) return trxWaitingList;
@@ -29,23 +30,51 @@ vector<int> Lock::getTrxWaitingList(lock_t* lockObj) {
 				lockObj = lockObj->lPrev;
 			}
 		}
-		else {
+		else if (lockObj->lockMode == X_MODE) {
+			lockObj = lockObj->lPrev;
 
+			if (lockObj->condition == WORKING) {
+				while (lockObj != nullptr) {
+					if (lockObj->tSentinel->trxId == trxId) continue;
+					trxWaitingList.push_back(lockObj->tSentinel->trxId);
+					lockObj = lockObj->lPrev;
+				}
+			}
+			else {
+				while (lockObj != nullptr && lockObj->lockMode == WAITING) {
+					int lockMode = lockObj->lockMode;
+
+					trxWaitingList.push_back(lockObj->tSentinel->trxId);
+					lockObj = lockObj->lPrev;
+
+					if (lockMode == X_MODE) break;
+				}
+			}
 		}
 	}
 
+	return trxWaitingList;
 }
 
 /* Return values
  * 0: No deadlock
  * 1: Deadlock
  */
-int Lock::detectDeadlock(lock_t* lockObj) {
-	set<int> waitForSet;
-
+int Lock::detectDeadlock(lock_t* lockObj, set<int>& waitForSet, int targetTrxId) {
 	vector<int> trxWaitingList = getTrxWaitingList(lockObj);
 
+	for (auto trxId : trxWaitingList) {
+		if (waitForSet.find(trxId) != waitForSet.end()) {
+			waitForSet.insert(trxId);
 
+			lock_t* tempLockObj = trxManager->trxTable[trxId]->head;
+			while (tempLockObj != nullptr) {
+				detectDeadlock(tempLockObj, waitForSet, targetTrxId);
+				if (waitForSet.find(targetTrxId) != waitForSet.end()) return 1;
+				tempLockObj = tempLockObj->tNext;
+			}
+		}
+	}
 
 	return 0;
 }
@@ -152,7 +181,7 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 			lockTable[rid]->tail = newLockObj;
 		}
 
-		// Append new lock object to transaction table
+		// Append a new lock object to transaction table
 		trxManager->updateTrxTable(trxId, newLockObj);
 
 		return newLockObj;
@@ -181,10 +210,15 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 		trxManager->updateTrxTable(trxId, newLockObj);
 
 		// Detect deadlock
-		int isDeadlock = detectDeadlock(newLockObj);
+		set<int> waitForSet;
+		int isDeadlock = detectDeadlock(newLockObj, waitForSet, trxId);
 
 		// Case: Deadlock
 		if (isDeadlock) return DEADLOCK;
+
+		// Wait
+		unique_lock<mutex> lk(lockTableMutex);
+		newLockObj->cond.wait(lk);
 
 		return newLockObj;
 	}
@@ -194,7 +228,94 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 }
 
 void Lock::releaseRecordLock(lock_t* lockObj) {
+	int rid = lockObj->lSentinel->key;
+	lock_t* prevLockObj, *nextLockObj;
 
+	// Case: Special case, lock release by abort
+	if (lockObj->condition == WAITING) {
+		prevLockObj = lockObj->lPrev;
+		nextLockObj = lockObj->lNext;
+
+		if (lockObj->lockMode == X_MODE &&
+			prevLockObj->condition == WORKING && prevLockObj->lockMode == S_MODE &&
+			nextLockObj->condition == WAITING && nextLockObj->lockMode == S_MODE)
+		{
+			// Delete lockObj on lock table list
+			prevLockObj->lNext = nextLockObj;
+			nextLockObj->lPrev = prevLockObj;
+
+			// Send signal to workable locks
+			while (nextLockObj != nullptr && nextLockObj->lockMode == S_MODE) {
+				nextLockObj->condition = WORKING;
+				nextLockObj->cond.notify_all();
+				nextLockObj = nextLockObj->lNext;
+			}
+		}
+
+		delete lockObj;
+		return;
+	}
+
+	// Case: Alone in the lock table list
+	if (lockTable[rid]->head == lockObj && lockTable[rid]->tail == lockObj) {
+		// Delete the entry from lock table
+		delete lockTable[rid];
+		lockTable.erase(rid);
+	}
+	else {
+		// Next lock object of lockObj
+		nextLockObj = lockTable[rid]->head->lNext;
+		prevLockObj = lockObj->lPrev;
+
+		// Case: Not alone in the lock table list, and working together
+		if (nextLockObj->condition == WORKING) {
+			if (lockTable[rid]->head == lockObj) {
+				lockTable[rid]->head = nextLockObj;
+				nextLockObj->lPrev = nullptr;
+			}
+			else {
+				prevLockObj->lNext = nextLockObj;
+				nextLockObj->lPrev = prevLockObj;
+			}
+
+			prevLockObj = lockTable[rid]->head;
+			nextLockObj = lockTable[rid]->head->lNext;
+
+			// Case: Special case, the transaction which already has s mode lock is waiting to get X mode lock
+			if (nextLockObj->condition == WAITING && prevLockObj->tSentinel->trxId == nextLockObj->tSentinel->trxId) {
+				lockTable[rid]->head = nextLockObj;
+				nextLockObj->lPrev = nullptr;
+				nextLockObj->condition = WORKING;
+
+				nextLockObj->cond.notify_all();
+
+				delete prevLockObj;
+			}
+		}
+
+		// Case: Not alone in the lock table list, but working alone
+		else if (nextLockObj->condition == WAITING) {
+			lockTable[rid]->head = nextLockObj; // Change the head of lock table to nextLockObj
+			nextLockObj->lPrev = nullptr; 		// Delete lockObj pointer in nextLockObj
+
+			// Next lock is the X mode waiting lock
+			if (nextLockObj->lockMode == X_MODE) {
+				nextLockObj->condition = WORKING;
+				nextLockObj->cond.notify_all();
+			}
+			// Next lock is the S mode waiting lock
+			else if (nextLockObj->lockMode == S_MODE) {
+				while (nextLockObj != nullptr && nextLockObj->lockMode == S_MODE) {
+					nextLockObj->condition = WORKING;
+					nextLockObj->cond.notify_all();
+					nextLockObj = nextLockObj->lNext;
+				}
+			}
+		}
+	}
+
+	// Delete the lock object
+	delete lockObj;
 }
 
 void Lock::acquireLockTableMutex() {
