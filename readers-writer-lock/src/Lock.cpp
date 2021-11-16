@@ -1,11 +1,39 @@
 #include "ConcurrencyControl.hpp"
 
-void Lock::getTrxWaitingList(set<int>& waitForSet, int trxId) {
-	lock_t* lockObj = trxManager->trxTable[trxId]->head;
+vector<int> Lock::getTrxWaitingList(lock_t* lockObj) {
+	vector<int> trxWaitingList;
 
-	while (lockObj != nullptr) {
+	// Case: lockObj is working
+	if (lockObj->condition == WORKING) return trxWaitingList;
 
+	// Case: lockObj is waiting
+	else {
+		if (lockObj->lockMode == S_MODE) {
+			while (lockObj != nullptr) {
+				// Case: Waiting for working locks
+				if (lockObj->condition == WORKING) {
+					while (lockObj != nullptr) {
+						trxWaitingList.push_back(lockObj->tSentinel->trxId);
+						lockObj = lockObj->lPrev;
+					}
+
+					break;
+				}
+
+				// Case: Waiting for X mode waiting lock
+				if (lockObj->lockMode == X_MODE) {
+					trxWaitingList.push_back(lockObj->tSentinel->trxId);
+					break;
+				}
+
+				lockObj = lockObj->lPrev;
+			}
+		}
+		else {
+
+		}
 	}
+
 }
 
 /* Return values
@@ -15,7 +43,7 @@ void Lock::getTrxWaitingList(set<int>& waitForSet, int trxId) {
 int Lock::detectDeadlock(lock_t* lockObj) {
 	set<int> waitForSet;
 
-	for ()
+	vector<int> trxWaitingList = getTrxWaitingList(lockObj);
 
 
 
@@ -33,7 +61,7 @@ int Lock::detectDeadlock(lock_t* lockObj) {
 int Lock::analyzeLockTable(int trxId, int rid, int lockMode, lock_t* lockObj) {
 	// Nothing in lock table list
 	if (lockTable.find(rid) == lockTable.end()) {
-		lockTable[rid] = new lockHeader_t(rid);
+		lockTable[rid] = new lockTable_t(rid);
 		return 1;
 	}
 
@@ -41,11 +69,11 @@ int Lock::analyzeLockTable(int trxId, int rid, int lockMode, lock_t* lockObj) {
 	int trxExistFlag = 0;
 	lockObj = lockTable[rid]->head;
 	while (lockObj != nullptr) {
-		if (lockObj->trxId == trxId) {
+		if (lockObj->tSentinel->trxId == trxId) {
 			trxExistFlag = 1;
 			break;
 		}
-		lockObj = lockObj->next;
+		lockObj = lockObj->lNext;
 	}
 
 	if (trxExistFlag) {
@@ -57,10 +85,10 @@ int Lock::analyzeLockTable(int trxId, int rid, int lockMode, lock_t* lockObj) {
 			if (lockMode == S_MODE) return 2;
 			if (lockMode == X_MODE) {
 				// Case: Working alone
-				if (lockObj->sentinel->head == lockObj && (lockObj->next == nullptr || lockObj->next->condition == WAITING)) return 3;
+				if (lockObj->lSentinel->head == lockObj && (lockObj->lNext == nullptr || lockObj->lNext->condition == WAITING)) return 3;
 
 				// Case: Working together without waiting lock
-				if (lockObj->sentinel->tail->condition == WORKING) return 4;
+				if (lockObj->lSentinel->tail->condition == WORKING) return 4;
 				// Case: Working together with waiting lock
 				else return 5;
 			}
@@ -110,19 +138,22 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 
 	// Acquire with linking
 	if (caseNum == 1) {
-		auto* newLockObj = new lock_t(trxId, lockMode, WAITING, lockTable[rid]);
+		auto* newLockObj = new lock_t(lockMode, WAITING, lockTable[rid]);
 		if (lockObj == nullptr) newLockObj->condition = WORKING;
 
+		// Append new lock object to lock table
 		if (lockTable[rid]->head == nullptr) {
-			newLockObj->sentinel = lockTable[rid];
 			lockTable[rid]->head = newLockObj;
 			lockTable[rid]->tail = newLockObj;
 		}
 		else {
-			lockTable[rid]->tail->next = newLockObj;
-			newLockObj->prev = lockTable[rid]->tail;
+			lockTable[rid]->tail->lNext = newLockObj;
+			newLockObj->lPrev = lockTable[rid]->tail;
 			lockTable[rid]->tail = newLockObj;
 		}
+
+		// Append new lock object to transaction table
+		trxManager->updateTrxTable(trxId, newLockObj);
 
 		return newLockObj;
 	}
@@ -139,15 +170,20 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 	// Detect deadlock (deadlock or wait)
 	if (caseNum == 4) {
 		// Wait
-		auto* newLockObj = new lock_t(trxId, lockMode, WAITING, lockTable[rid]);
+		auto* newLockObj = new lock_t(lockMode, WAITING, lockTable[rid]);
 
-		lockTable[rid]->tail->next = newLockObj;
-		newLockObj->prev = lockTable[rid]->tail;
+		// Append new lock object to lock table
+		lockTable[rid]->tail->lNext = newLockObj;
+		newLockObj->lPrev = lockTable[rid]->tail;
 		lockTable[rid]->tail = newLockObj;
 
+		// Append new lock object to transaction table
+		trxManager->updateTrxTable(trxId, newLockObj);
+
+		// Detect deadlock
 		int isDeadlock = detectDeadlock(newLockObj);
 
-		// Deadlock
+		// Case: Deadlock
 		if (isDeadlock) return DEADLOCK;
 
 		return newLockObj;

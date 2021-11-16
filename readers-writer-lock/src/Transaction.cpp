@@ -1,13 +1,15 @@
 #include "ConcurrencyControl.hpp"
 
 void Transaction::updateTrxTable(int trxId, lock_t* lockObj) {
+	lockObj->tSentinel = trxTable[trxId];
+
 	if (trxTable[trxId]->head == nullptr) {
 		trxTable[trxId]->head = lockObj;
 		trxTable[trxId]->tail = lockObj;
 	}
 	else {
-		trxTable[trxId]->tail->next = lockObj;
-		lockObj->prev = trxTable[trxId]->tail;
+		trxTable[trxId]->tail->tNext = lockObj;
+		lockObj->tPrev = trxTable[trxId]->tail;
 		trxTable[trxId]->tail = lockObj;
 	}
 }
@@ -17,7 +19,7 @@ void Transaction::releaseAcquiredLocks(int trxId) {
 
 	while (lockObj != nullptr) {
 		lockManager->releaseRecordLock(lockObj);
-		lockObj = lockObj->next;
+		lockObj = lockObj->tNext;
 	}
 }
 
@@ -26,7 +28,7 @@ int Transaction::trxBegin() {
 
 	trxIdSeqMutex.lock();
 	id = trxIdSeq++;
-	trxTable[id] = new trxHeader_t();
+	trxTable[id] = new trxTable_t(id);
 	trxIdSeqMutex.unlock();
 
 	return id;
@@ -92,11 +94,8 @@ int64_t Transaction::trxRead(int trxId, int rid, int* deadlockFlag) {
 		return 0;
 	}
 	else {
-		// Update a transaction operation list
-		updateTrxTable(trxId, lockObj);
-
 		// Logging operation result for commit log
-		trxTable[trxId]->history.push_back(lockObj->sentinel->key);
+		trxTable[trxId]->history.push_back(lockObj->lSentinel->key);
 	}
 
 	lockManager->releaseLockTableMutex();
@@ -114,23 +113,20 @@ void Transaction::trxWrite(int trxId, int rid, int64_t value, int* deadlockFlag)
 		return;
 	}
 	else {
-		// Update a transaction operation list
-		updateTrxTable(trxId, lockObj);
-
 		// Logging oldest value
 		if (trxTable[trxId]->undoLog.find(rid) == trxTable[trxId]->undoLog.end())
-			trxTable[trxId]->undoLog[rid] = lockObj->sentinel->key;
+			trxTable[trxId]->undoLog[rid] = lockObj->lSentinel->key;
 
 		// Update lock object's key value
-		lockObj->sentinel->key += value;
+		lockObj->lSentinel->key += value;
 
 		// Logging operation result for commit log
-		trxTable[trxId]->history.push_back(lockObj->sentinel->key);
+		trxTable[trxId]->history.push_back(lockObj->lSentinel->key);
 	}
 
 	lockManager->releaseLockTableMutex();
 
-	database->updateRecord(rid, lockObj->sentinel->key);
+	database->updateRecord(rid, lockObj->lSentinel->key);
 }
 
 int Transaction::startTrx(vector<int> recordIdx, int tid) {
