@@ -83,7 +83,7 @@ class TwoPhaseLockingRunner {
 		for (int tid = 1; tid <= numThread; tid++)
 			ioService.post(boost::bind(&TwoPhaseLockingRunner::readersWriterRoutine, this, tid));
 
-//		ioService.stop();
+		ioService.stop();
 		threadPool.join_all();
 	}
 

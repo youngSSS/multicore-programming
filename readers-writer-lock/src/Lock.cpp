@@ -1,5 +1,27 @@
 #include "ConcurrencyControl.hpp"
 
+#include <iostream>
+
+void Lock::printLockTable() {
+	cout << "########## Lock Table ##########" << endl;
+	for (auto l : lockTable) {
+		lock_t* lockObj = l.second->head;
+		cout << "rid(" << l.first << ") - ";
+
+		while (lockObj != nullptr) {
+			if (lockObj->tSentinel->trxId == 0) {
+
+			}
+
+			cout << "[ " << "trxId(" << lockObj->tSentinel->trxId << "), " << (lockObj->lockMode == S_MODE ? "S" : "X")
+				<< ", " << (lockObj->condition == WORKING ? "W" : "Z") << " ], ";
+			lockObj = lockObj->lNext;
+		}
+		cout << endl;
+	}
+	cout << endl;
+}
+
 vector<int> Lock::getTrxWaitingList(lock_t* lockObj) {
 	vector<int> trxWaitingList;
 	int trxId = lockObj->tSentinel->trxId;
@@ -91,6 +113,9 @@ int Lock::analyzeLockTable(int trxId, int rid, int lockMode, lock_t* lockObj) {
 	// Nothing in lock table list
 	if (lockTable.find(rid) == lockTable.end()) {
 		lockTable[rid] = new lockTable_t(rid);
+		if (lockTable[rid] == nullptr) {
+
+		}
 		return 1;
 	}
 
@@ -184,6 +209,8 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 		// Append a new lock object to transaction table
 		trxManager->updateTrxTable(trxId, newLockObj);
 
+		printLockTable();
+
 		return newLockObj;
 	}
 
@@ -192,6 +219,7 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 
 	// Upgrade to X_MODE & Acquire without linking
 	if (caseNum == 3) {
+		printLockTable();
 		lockObj->lockMode = X_MODE;
 		return lockObj;
 	}
@@ -216,9 +244,13 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 		// Case: Deadlock
 		if (isDeadlock) return DEADLOCK;
 
+		printLockTable();
 		// Wait
-		unique_lock<mutex> lk(lockTableMutex);
-		newLockObj->cond.wait(lk);
+		boost::unique_lock<boost::mutex> lk(lockTableMutex, boost::adopt_lock);
+		do {
+			newLockObj->cond.wait(lk);
+		} while (lockTableMutex.try_lock() == false);
+
 
 		return newLockObj;
 	}
@@ -236,7 +268,12 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 		prevLockObj = lockObj->lPrev;
 		nextLockObj = lockObj->lNext;
 
-		if (lockObj->lockMode == X_MODE &&
+		if (nextLockObj == nullptr) {
+			lockTable[rid]->tail = lockObj->lPrev;
+			prevLockObj->lNext = nullptr;
+		}
+
+		else if (lockObj->lockMode == X_MODE &&
 			prevLockObj->condition == WORKING && prevLockObj->lockMode == S_MODE &&
 			nextLockObj->condition == WAITING && nextLockObj->lockMode == S_MODE)
 		{
@@ -252,6 +289,8 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 			}
 		}
 
+		printLockTable();
+
 		delete lockObj;
 		return;
 	}
@@ -264,25 +303,29 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 	}
 	else {
 		// Next lock object of lockObj
-		nextLockObj = lockTable[rid]->head->lNext;
+		nextLockObj = lockObj->lNext;
 		prevLockObj = lockObj->lPrev;
 
 		// Case: Not alone in the lock table list, and working together
-		if (nextLockObj->condition == WORKING) {
-			if (lockTable[rid]->head == lockObj) {
-				lockTable[rid]->head = nextLockObj;
-				nextLockObj->lPrev = nullptr;
-			}
-			else {
+		if ((prevLockObj != nullptr && prevLockObj->condition == WORKING) || (nextLockObj != nullptr && nextLockObj->condition == WORKING)) {
+			if (prevLockObj != nullptr && nextLockObj != nullptr) {
 				prevLockObj->lNext = nextLockObj;
 				nextLockObj->lPrev = prevLockObj;
+			}
+			else if (prevLockObj != nullptr) {
+				lockTable[rid]->tail = prevLockObj;
+				prevLockObj->lNext = nullptr;
+			}
+			else if (nextLockObj != nullptr) {
+				lockTable[rid]->head = nextLockObj;
+				nextLockObj->lPrev = nullptr;
 			}
 
 			prevLockObj = lockTable[rid]->head;
 			nextLockObj = lockTable[rid]->head->lNext;
 
 			// Case: Special case, the transaction which already has s mode lock is waiting to get X mode lock
-			if (nextLockObj->condition == WAITING && prevLockObj->tSentinel->trxId == nextLockObj->tSentinel->trxId) {
+			if (nextLockObj != nullptr && nextLockObj->condition == WAITING && prevLockObj->tSentinel->trxId == nextLockObj->tSentinel->trxId) {
 				lockTable[rid]->head = nextLockObj;
 				nextLockObj->lPrev = nullptr;
 				nextLockObj->condition = WORKING;
@@ -313,6 +356,8 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 			}
 		}
 	}
+
+	printLockTable();
 
 	// Delete the lock object
 	delete lockObj;

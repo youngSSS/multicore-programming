@@ -56,7 +56,7 @@ struct lock_t {
 	lock_t* tPrev = nullptr;
 	lock_t* tNext = nullptr;
 
-	condition_variable cond;
+	boost::condition_variable cond;
 
 	lock_t(int mode, int c, lockTable_t* ls) :
 		lockMode(mode), condition(c), lSentinel(ls), tSentinel(nullptr) {}
@@ -73,7 +73,6 @@ class Transaction {
 	int threadId;
 	int executionLimit;
 	int numExecution;
-
 
 	void releaseAcquiredLocks(int trxId);
 
@@ -106,8 +105,9 @@ class Lock {
 
 	unordered_map<int, lockTable_t*> lockTable;
 
-	mutex lockTableMutex;
+	boost::mutex lockTableMutex;
 
+	void printLockTable();
 	vector<int> getTrxWaitingList(lock_t* lockObj);
 	int detectDeadlock(lock_t* lockObj, set<int>& waitForSet, int targetTrxId);
 	int analyzeLockTable(int trxId, int rid, int lockMode, lock_t* lockObj);
