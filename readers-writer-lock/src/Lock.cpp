@@ -22,85 +22,6 @@ void Lock::printLockTable() {
 	cout << endl;
 }
 
-vector<int> Lock::getTrxWaitingList(lock_t* lockObj) {
-	vector<int> trxWaitingList;
-	int trxId = lockObj->tSentinel->trxId;
-
-	// Case: lockObj is working
-	if (lockObj->condition == WORKING) return trxWaitingList;
-
-	// Case: lockObj is waiting
-	else {
-		if (lockObj->lockMode == S_MODE) {
-			while (lockObj != nullptr) {
-				// Case: Waiting for working locks
-				if (lockObj->condition == WORKING) {
-					while (lockObj != nullptr) {
-						trxWaitingList.push_back(lockObj->tSentinel->trxId);
-						lockObj = lockObj->lPrev;
-					}
-
-					break;
-				}
-
-				// Case: Waiting for X mode waiting lock
-				if (lockObj->lockMode == X_MODE) {
-					trxWaitingList.push_back(lockObj->tSentinel->trxId);
-					break;
-				}
-
-				lockObj = lockObj->lPrev;
-			}
-		}
-		else if (lockObj->lockMode == X_MODE) {
-			lockObj = lockObj->lPrev;
-
-			if (lockObj->condition == WORKING) {
-				while (lockObj != nullptr) {
-					if (lockObj->tSentinel->trxId == trxId) continue;
-					trxWaitingList.push_back(lockObj->tSentinel->trxId);
-					lockObj = lockObj->lPrev;
-				}
-			}
-			else {
-				while (lockObj != nullptr && lockObj->lockMode == WAITING) {
-					int lockMode = lockObj->lockMode;
-
-					trxWaitingList.push_back(lockObj->tSentinel->trxId);
-					lockObj = lockObj->lPrev;
-
-					if (lockMode == X_MODE) break;
-				}
-			}
-		}
-	}
-
-	return trxWaitingList;
-}
-
-/* Return values
- * 0: No deadlock
- * 1: Deadlock
- */
-int Lock::detectDeadlock(lock_t* lockObj, set<int>& waitForSet, int targetTrxId) {
-	vector<int> trxWaitingList = getTrxWaitingList(lockObj);
-
-	for (auto trxId : trxWaitingList) {
-		if (waitForSet.find(trxId) != waitForSet.end()) {
-			waitForSet.insert(trxId);
-
-			lock_t* tempLockObj = trxManager->trxTable[trxId]->head;
-			while (tempLockObj != nullptr) {
-				detectDeadlock(tempLockObj, waitForSet, targetTrxId);
-				if (waitForSet.find(targetTrxId) != waitForSet.end()) return 1;
-				tempLockObj = tempLockObj->tNext;
-			}
-		}
-	}
-
-	return 0;
-}
-
 /* Return values
  * 0: Impossible cases
  * 1: Acquire with linking
@@ -239,18 +160,14 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 
 		// Detect deadlock
 		set<int> waitForSet;
-		int isDeadlock = detectDeadlock(newLockObj, waitForSet, trxId);
+		int isDeadlock = trxManager->detectDeadlock(newLockObj, waitForSet, trxId);
 
 		// Case: Deadlock
 		if (isDeadlock) return DEADLOCK;
 
 		printLockTable();
 		// Wait
-		boost::unique_lock<boost::mutex> lk(lockTableMutex, boost::adopt_lock);
-		do {
-			newLockObj->cond.wait(lk);
-		} while (lockTableMutex.try_lock() == false);
-
+		newLockObj->cond.wait(lockTableLockers[trxManager->getThreadId(boost::this_thread::get_id())]);
 
 		return newLockObj;
 	}
@@ -284,7 +201,7 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 			// Send signal to workable locks
 			while (nextLockObj != nullptr && nextLockObj->lockMode == S_MODE) {
 				nextLockObj->condition = WORKING;
-				nextLockObj->cond.notify_all();
+				nextLockObj->cond.notify_one();
 				nextLockObj = nextLockObj->lNext;
 			}
 		}
@@ -330,7 +247,7 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 				nextLockObj->lPrev = nullptr;
 				nextLockObj->condition = WORKING;
 
-				nextLockObj->cond.notify_all();
+				nextLockObj->cond.notify_one();
 
 				delete prevLockObj;
 			}
@@ -344,13 +261,13 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 			// Next lock is the X mode waiting lock
 			if (nextLockObj->lockMode == X_MODE) {
 				nextLockObj->condition = WORKING;
-				nextLockObj->cond.notify_all();
+				nextLockObj->cond.notify_one();
 			}
 			// Next lock is the S mode waiting lock
 			else if (nextLockObj->lockMode == S_MODE) {
 				while (nextLockObj != nullptr && nextLockObj->lockMode == S_MODE) {
 					nextLockObj->condition = WORKING;
-					nextLockObj->cond.notify_all();
+					nextLockObj->cond.notify_one();
 					nextLockObj = nextLockObj->lNext;
 				}
 			}
@@ -364,11 +281,11 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 }
 
 void Lock::acquireLockTableMutex() {
-	lockTableMutex.lock();
+	lockTableLockers[trxManager->getThreadId(boost::this_thread::get_id())].lock();
 }
 
 void Lock::releaseLockTableMutex() {
-	lockTableMutex.unlock();
+	lockTableLockers[trxManager->getThreadId(boost::this_thread::get_id())].unlock();
 }
 
 void Lock::setTrxManager(Transaction* t) {

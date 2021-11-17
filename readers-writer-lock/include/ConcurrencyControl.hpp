@@ -29,7 +29,7 @@ struct lockTable_t {
 	lock_t* head;
 	lock_t* tail;
 
-	lockTable_t(int64_t k) : head(nullptr), tail(nullptr), key(k) {}
+	explicit lockTable_t(int64_t k) : head(nullptr), tail(nullptr), key(k) {}
 };
 
 struct trxTable_t {
@@ -41,7 +41,7 @@ struct trxTable_t {
 	unordered_map<int, int64_t> undoLog;
 	vector<int64_t> history;
 
-	trxTable_t(int trxId) : trxId(trxId), head(nullptr), tail(nullptr) {}
+	explicit trxTable_t(int trxId) : trxId(trxId), head(nullptr), tail(nullptr) {}
 };
 
 struct lock_t {
@@ -68,34 +68,42 @@ class Transaction {
 	Database* database;
 	Lock* lockManager;
 
+	unordered_map<int, trxTable_t*> trxTable;
 	int trxIdSeq;
 
-	int threadId;
+
 	int executionLimit;
 	int numExecution;
 
+	// Private methods
+	int  trxBegin();
+	int  trxCommit(int trxId, vector<int> recordIdx);
+	void trxRollback(int trxId);
+	int  trxRead(int trxId, int rid, int64_t* readValue); // Success(0), Deadlock(1)
+	int  trxWrite(int trxId, int rid, int64_t value); 	  // Success(0), Deadlock(1)
+
 	void releaseAcquiredLocks(int trxId);
 
-	// Transaction methods
-	int trxBegin();
-	int trxCommit(int trxId, vector<int> recordIdx);
-	void trxRollback(int trxId);
-	int64_t trxRead(int trxId, int rid, int* deadlockFlag);
-	void trxWrite(int trxId, int rid, int64_t value, int* deadlockFlag);
-
  public:
-	unordered_map<int, trxTable_t*> trxTable;
+	vector<boost::thread::id> threadId;
+
+	int getThreadId(boost::thread::id realId) {
+		auto iter = find(threadId.begin(), threadId.end(), realId);
+		return iter - threadId.begin();
+	}
 
 	// Constructor
-	Transaction(Database* db, int e) :
-		database(db), lockManager(nullptr), executionLimit(e), trxIdSeq(0), threadId(-1), numExecution(0) {}
+	Transaction(Database* db, int e, int t) :
+		database(db), lockManager(nullptr), executionLimit(e), trxIdSeq(0), numExecution(0) {
+		threadId.resize(t + 1);
+	}
 
-	// Update transaction table
-	void updateTrxTable(int trxId, lock_t* lockObj);
-
-	// Start transaction routine
-	int startTrx(vector<int> recordIdx, int tid);
+	// Public methods
+	int  startTrx(vector<int> recordIdx, int tid);
 	void setLockManager(Lock* l);
+	void updateTrxTable(int trxId, lock_t* lockObj);
+	int  detectDeadlock(lock_t* lockObj, set<int>& waitForSet, int targetTrxId);
+
 };
 
 class Lock {
@@ -104,26 +112,26 @@ class Lock {
 	Transaction* trxManager;
 
 	unordered_map<int, lockTable_t*> lockTable;
-
 	boost::mutex lockTableMutex;
+	unordered_map<int, boost::unique_lock<boost::mutex> > lockTableLockers;
 
+	// Private methods
 	void printLockTable();
-	vector<int> getTrxWaitingList(lock_t* lockObj);
-	int detectDeadlock(lock_t* lockObj, set<int>& waitForSet, int targetTrxId);
-	int analyzeLockTable(int trxId, int rid, int lockMode, lock_t* lockObj);
+	int  analyzeLockTable(int trxId, int rid, int lockMode, lock_t* lockObj);
 
  public:
 	// Constructor
-	Lock(Database* db) : database(db), trxManager(nullptr) {}
+	Lock(Database* db, int numThread) : database(db), trxManager(nullptr) {
+		for (int i = 1; i <= numThread; i++)
+			lockTableLockers[i] = boost::unique_lock<boost::mutex>(lockTableMutex, boost::defer_lock);
+	}
 
-	// Lock methods
+	// Public methods
 	lock_t* acquireRecordLock(int trxId, int rid, int lockMode);
-	void releaseRecordLock(lock_t* lockObj);
-
-	void acquireLockTableMutex();
-	void releaseLockTableMutex();
-
-	void setTrxManager(Transaction* t);
+	void 	releaseRecordLock(lock_t* lockObj);
+	void 	acquireLockTableMutex();
+	void 	releaseLockTableMutex();
+	void 	setTrxManager(Transaction* t);
 };
 
 #endif //READERS_WRITER_LOCK_INCLUDE_CONCURRENCYCONTROL_HPP_

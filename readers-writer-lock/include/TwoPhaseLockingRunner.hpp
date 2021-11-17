@@ -16,20 +16,23 @@ using namespace std;
 
 class TwoPhaseLockingRunner {
  private:
+	// User inputs
 	int numThread;
 	int numRecord;
 	int numExecution;
 
+	// Two phase locking classes
 	Database* database;
 	Transaction* transaction;
 	Lock* lock;
 
+	// Boost thread
 	boost::asio::io_service ioService;
 	boost::asio::io_service::work work;
 	boost::thread_group threadPool;
 
-	// Test routine
-	void readersWriterRoutine(int tid) {
+	// Thread routine
+	void threadFunc(int tid) {
 		vector<int> recordIdx;
 
 		random_device rd;
@@ -54,8 +57,8 @@ class TwoPhaseLockingRunner {
 	TwoPhaseLockingRunner(int t, int r, int e) : numThread(t), numRecord(r), numExecution(e), work(ioService) {
 		// Initialize
 		database = new Database(r);
-		transaction = new Transaction(database, numExecution);
-		lock = new Lock(database);
+		transaction = new Transaction(database, numExecution, numThread);
+		lock = new Lock(database, numThread);
 
 		transaction->setLockManager(lock);
 		lock->setTrxManager(transaction);
@@ -64,7 +67,7 @@ class TwoPhaseLockingRunner {
 		for (int i = 0; i < numThread; i++)
 			threadPool.create_thread(boost::bind(&boost::asio::io_service::run, &ioService));
 
-		// Initialize the file data
+		// Initialize the result files
 		for (int i = 1; i <= numThread; i++) {
 			ofstream fout("thread" + to_string(i) + ".txt");
 			fout.close();
@@ -78,11 +81,13 @@ class TwoPhaseLockingRunner {
 		delete lock;
 	}
 
-	// Test method
+	// Two phase locking running method
 	void startReadersWriterTest() {
+		// Bind thread function to threads
 		for (int tid = 1; tid <= numThread; tid++)
-			ioService.post(boost::bind(&TwoPhaseLockingRunner::readersWriterRoutine, this, tid));
+			ioService.post([this, tid] { threadFunc(tid); });
 
+		// Wait until the termination of threads
 		ioService.stop();
 		threadPool.join_all();
 	}
