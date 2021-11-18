@@ -179,83 +179,33 @@ void Transaction::updateTrxTable(int trxId, lock_t* lockObj) {
 	}
 }
 
+int dfs(int trxId, unordered_map<int, vector<int>>& nodes, unordered_map<int, int>& visit) {
+	visit[trxId] = 1;
+
+	for (int adjTrxId : nodes[trxId]) {
+		// Cycle, deadlock
+		if (visit[adjTrxId] == 1) return 1;
+
+		if (dfs(adjTrxId, nodes, visit) == 1) return 1;
+	}
+
+	return 0;
+}
+
 /* Return values
  * 0: No deadlock
  * 1: Deadlock
  */
 int Transaction::detectDeadlock(lock_t* lockObj, set<int>& waitForSet, int targetTrxId) {
-	// If lockObj is working lock, it's not waiting anything
-	if (lockObj->condition == WORKING) return 0;
+	unordered_map<int, vector<int>> nodes; // (trxId, isVisit)
 
-	// Case: Special case, transaction waits its own but it's not deadlock
-	if (lockObj->lockMode == X_MODE) {
-		lock_t* prevLockObj = lockObj->lPrev;
+	lockManager->getWaitForGraph(nodes);
 
-		if (prevLockObj->lockMode == S_MODE && prevLockObj->condition == WORKING) {
-			int ownFlag = 0;
-			while (prevLockObj != nullptr && ownFlag == 0) {
-				if (prevLockObj->tSentinel->trxId == targetTrxId)
-					ownFlag = 1;
-				prevLockObj = prevLockObj->lPrev;
-			}
-
-			if (ownFlag) return 0;
-		}
-	}
-
-	// Case: lockObj is waiting lock
-	if (lockObj->lockMode == S_MODE) {
-		lockObj = lockObj->lPrev;
-
-		if (lockObj->lockMode == S_MODE) {
-			while (lockObj != nullptr && lockObj->lockMode == S_MODE)
-				lockObj = lockObj->lPrev;
-		}
-
-		waitForSet.insert(lockObj->tSentinel->trxId);
+	for (const auto& node : nodes) {
+		unordered_map<int, int> visit;
 
 		// Deadlock
-		if (waitForSet.find(targetTrxId) != waitForSet.end()) return 1;
-
-		lock_t* trxLockObj = trxTable[lockObj->tSentinel->trxId]->head;
-		while (trxLockObj != nullptr) {
-			// Deadlock
-			if (detectDeadlock(trxLockObj, waitForSet, targetTrxId)) return 1;
-			trxLockObj = trxLockObj->tNext;
-		}
-	}
-	else if (lockObj->lockMode == X_MODE) {
-		lockObj = lockObj->lPrev;
-
-		if (lockObj->lockMode == S_MODE) {
-			while (lockObj != nullptr && lockObj->lockMode == S_MODE) {
-				waitForSet.insert(lockObj->tSentinel->trxId);
-
-				if (waitForSet.find(targetTrxId) != waitForSet.end()) return 1;
-
-				lock_t* trxLockObj = trxTable[lockObj->tSentinel->trxId]->head;
-				while (trxLockObj != nullptr) {
-					// Deadlock
-					if (detectDeadlock(trxLockObj, waitForSet, targetTrxId)) return 1;
-					trxLockObj = trxLockObj->tNext;
-				}
-
-				lockObj = lockObj->lPrev;
-			}
-		}
-		else if (lockObj->lockMode == X_MODE) {
-			waitForSet.insert(lockObj->tSentinel->trxId);
-
-			// Deadlock
-			if (waitForSet.find(targetTrxId) != waitForSet.end()) return 1;
-
-			lock_t* trxLockObj = trxTable[lockObj->tSentinel->trxId]->head;
-			while (trxLockObj != nullptr) {
-				// Deadlock
-				if (detectDeadlock(trxLockObj, waitForSet, targetTrxId)) return 1;
-				trxLockObj = trxLockObj->tNext;
-			}
-		}
+		if (dfs(node.first, nodes, visit) == 1) return 1;
 	}
 
 	return 0;

@@ -158,6 +158,8 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 		// Append new lock object to transaction table
 		trxManager->updateTrxTable(trxId, newLockObj);
 
+		printLockTable();
+
 		// Detect deadlock
 		set<int> waitForSet;
 		int isDeadlock = trxManager->detectDeadlock(newLockObj, waitForSet, trxId);
@@ -290,4 +292,45 @@ void Lock::releaseLockTableMutex() {
 
 void Lock::setTrxManager(Transaction* t) {
 	trxManager = t;
+}
+
+void Lock::getWaitForGraph(unordered_map<int, vector<int>>& nodes) {
+	// Traverse lockTable
+	for (auto lockList : lockTable) {
+		lock_t* baseLockObj = lockList.second->tail;
+
+		while (baseLockObj != nullptr) {
+			lock_t* lockObj = baseLockObj;
+			int trxId = lockObj->tSentinel->trxId;
+
+			// Append a relation to wait-for graph
+			if (lockObj->condition == WAITING) {
+				if (lockObj->lockMode == S_MODE) {
+					lockObj = lockObj->lPrev;
+
+					if (lockObj->lockMode == S_MODE) {
+						while (lockObj->lockMode == S_MODE)
+							lockObj = lockObj->lPrev;
+					}
+
+					nodes[trxId].push_back(lockObj->tSentinel->trxId);
+				}
+				else if (lockObj->lockMode == X_MODE) {
+					lockObj = lockObj->lPrev;
+
+					if (lockObj->lockMode == S_MODE) {
+						while (lockObj != nullptr && lockObj->lockMode == S_MODE) {
+							nodes[trxId].push_back(lockObj->tSentinel->trxId);
+							lockObj = lockObj->lPrev;
+						}
+					}
+					else if (lockObj->lockMode == X_MODE) {
+						nodes[trxId].push_back(lockObj->tSentinel->trxId);
+					}
+				}
+			}
+
+			baseLockObj = baseLockObj->lPrev;
+		}
+	}
 }

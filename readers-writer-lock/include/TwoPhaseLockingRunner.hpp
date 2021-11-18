@@ -26,7 +26,7 @@ class TwoPhaseLockingRunner {
 	Transaction* transaction;
 	Lock* lock;
 
-	// Boost thread
+	// Boost
 	boost::asio::io_service ioService;
 	boost::asio::io_service::work work;
 	boost::thread_group threadPool;
@@ -65,7 +65,7 @@ class TwoPhaseLockingRunner {
 
 		// Make thread pool
 		for (int i = 0; i < numThread; i++)
-			threadPool.create_thread(boost::bind(&boost::asio::io_service::run, &ioService));
+			threadPool.create_thread([ObjectPtr = &ioService] { ObjectPtr->run(); });
 
 		// Initialize the result files
 		for (int i = 1; i <= numThread; i++) {
