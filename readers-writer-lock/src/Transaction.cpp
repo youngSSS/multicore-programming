@@ -179,14 +179,14 @@ void Transaction::updateTrxTable(int trxId, lock_t* lockObj) {
 	}
 }
 
-int dfs(int trxId, unordered_map<int, vector<int>>& nodes, unordered_map<int, int>& visit) {
+int traverseWaitForGraph(int trxId, unordered_map< int, vector<int> >& nodes, unordered_map<int, int>& visit) {
 	visit[trxId] = 1;
 
 	for (int adjTrxId : nodes[trxId]) {
 		// Cycle, deadlock
 		if (visit[adjTrxId] == 1) return 1;
 
-		if (dfs(adjTrxId, nodes, visit) == 1) return 1;
+		if (traverseWaitForGraph(adjTrxId, nodes, visit) == 1) return 1;
 	}
 
 	return 0;
@@ -197,7 +197,7 @@ int dfs(int trxId, unordered_map<int, vector<int>>& nodes, unordered_map<int, in
  * 1: Deadlock
  */
 int Transaction::detectDeadlock(lock_t* lockObj, set<int>& waitForSet, int targetTrxId) {
-	unordered_map<int, vector<int>> nodes; // (trxId, isVisit)
+	unordered_map< int, vector<int> > nodes; // (trxId, isVisit)
 
 	lockManager->getWaitForGraph(nodes);
 
@@ -205,7 +205,7 @@ int Transaction::detectDeadlock(lock_t* lockObj, set<int>& waitForSet, int targe
 		unordered_map<int, int> visit;
 
 		// Deadlock
-		if (dfs(node.first, nodes, visit) == 1) return 1;
+		if (traverseWaitForGraph(node.first, nodes, visit) == 1) return 1;
 	}
 
 	return 0;

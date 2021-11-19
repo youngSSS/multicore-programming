@@ -71,7 +71,7 @@ class TwoPhaseLockingRunner {
 
 		// Make thread pool
 		for (int i = 0; i < numThread; i++)
-			threadPool.create_thread([ObjectPtr = &ioService] { ObjectPtr->run(); });
+			threadPool.create_thread(boost::bind(&boost::asio::io_service::run, &ioService));
 
 		// Initialize the result files
 		for (int i = 1; i <= numThread; i++) {
@@ -91,7 +91,7 @@ class TwoPhaseLockingRunner {
 	void startReadersWriterTest() {
 		// Bind thread function to threads
 		for (int tid = 1; tid <= numThread; tid++)
-			ioService.post([this, tid] { threadFunc(tid); });
+			ioService.post(boost::bind(&TwoPhaseLockingRunner::threadFunc, this, tid));
 
 		// Wait for the end of ioService
 		pthread_mutex_lock(&mainMutex);

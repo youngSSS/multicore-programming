@@ -131,7 +131,7 @@ class Lock {
 	void 	acquireLockTableMutex();
 	void 	releaseLockTableMutex();
 	void 	setTrxManager(Transaction* t);
-	void	getWaitForGraph(unordered_map<int, vector<int>>& nodes);
+	void	getWaitForGraph(unordered_map< int, vector<int> >& nodes);
 };
 
 #endif //READERS_WRITER_LOCK_INCLUDE_CONCURRENCYCONTROL_HPP_

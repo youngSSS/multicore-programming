@@ -130,8 +130,6 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 		// Append a new lock object to transaction table
 		trxManager->updateTrxTable(trxId, newLockObj);
 
-		printLockTable();
-
 		return newLockObj;
 	}
 
@@ -140,7 +138,6 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 
 	// Upgrade to X_MODE & Acquire without linking
 	if (caseNum == 3) {
-		printLockTable();
 		lockObj->lockMode = X_MODE;
 		return lockObj;
 	}
@@ -158,8 +155,6 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 		// Append new lock object to transaction table
 		trxManager->updateTrxTable(trxId, newLockObj);
 
-		printLockTable();
-
 		// Detect deadlock
 		set<int> waitForSet;
 		int isDeadlock = trxManager->detectDeadlock(newLockObj, waitForSet, trxId);
@@ -167,7 +162,6 @@ lock_t* Lock::acquireRecordLock(int trxId, int rid, int lockMode) {
 		// Case: Deadlock
 		if (isDeadlock) return DEADLOCK;
 
-		printLockTable();
 		// Wait
 		newLockObj->cond.wait(lockTableLockers[trxManager->getThreadId(boost::this_thread::get_id())]);
 
@@ -294,7 +288,7 @@ void Lock::setTrxManager(Transaction* t) {
 	trxManager = t;
 }
 
-void Lock::getWaitForGraph(unordered_map<int, vector<int>>& nodes) {
+void Lock::getWaitForGraph(unordered_map< int, vector<int> >& nodes) {
 	// Traverse lockTable
 	for (auto lockList : lockTable) {
 		lock_t* baseLockObj = lockList.second->tail;
