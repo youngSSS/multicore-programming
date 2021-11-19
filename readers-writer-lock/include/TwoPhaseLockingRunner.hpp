@@ -4,10 +4,11 @@
 #include <iostream>
 #include <vector>
 #include <random>
+#include <unordered_map>
+#include <pthread.h>
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>
-#include <unordered_map>
 
 #include "Database.hpp"
 #include "ConcurrencyControl.hpp"
@@ -31,8 +32,13 @@ class TwoPhaseLockingRunner {
 	boost::asio::io_service::work work;
 	boost::thread_group threadPool;
 
+	pthread_mutex_t mainMutex = PTHREAD_MUTEX_INITIALIZER;
+	pthread_cond_t mainCond = PTHREAD_COND_INITIALIZER;
+
 	// Thread routine
 	void threadFunc(int tid) {
+		if (tid == numThread) pthread_cond_signal(&mainCond);
+
 		vector<int> recordIdx;
 
 		random_device rd;
@@ -86,6 +92,10 @@ class TwoPhaseLockingRunner {
 		// Bind thread function to threads
 		for (int tid = 1; tid <= numThread; tid++)
 			ioService.post([this, tid] { threadFunc(tid); });
+
+		pthread_mutex_lock(&mainMutex);
+		pthread_cond_wait(&mainCond, &mainMutex);
+		pthread_mutex_unlock(&mainMutex);
 
 		// Wait until the termination of threads
 		ioService.stop();
