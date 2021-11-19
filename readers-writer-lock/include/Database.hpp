@@ -1,6 +1,7 @@
 #ifndef READERS_WRITER_LOCK_INCLUDE_DATABASE_HPP_
 #define READERS_WRITER_LOCK_INCLUDE_DATABASE_HPP_
 
+#include <stdint.h>
 #include <vector>
 
 using namespace std;
