@@ -202,8 +202,6 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 			}
 		}
 
-		printLockTable();
-
 		delete lockObj;
 		return;
 	}
@@ -269,8 +267,6 @@ void Lock::releaseRecordLock(lock_t* lockObj) {
 			}
 		}
 	}
-
-	printLockTable();
 
 	// Delete the lock object
 	delete lockObj;
