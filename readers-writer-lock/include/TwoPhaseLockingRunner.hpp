@@ -93,6 +93,7 @@ class TwoPhaseLockingRunner {
 		for (int tid = 1; tid <= numThread; tid++)
 			ioService.post([this, tid] { threadFunc(tid); });
 
+		// Wait for the end of ioService
 		pthread_mutex_lock(&mainMutex);
 		pthread_cond_wait(&mainCond, &mainMutex);
 		pthread_mutex_unlock(&mainMutex);
